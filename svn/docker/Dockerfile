@@ -1,4 +1,4 @@
-FROM debian:bullseye
+FROM debian:bookworm-20260505-slim
 
 COPY certs/ca.crt /usr/local/share/ca-certificates/self-ca.crt
 

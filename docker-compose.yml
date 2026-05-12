@@ -1,6 +1,6 @@
 services:
   nginx:
-    image: nginx:latest
+    image: nginx:1.29
     container_name: cicd-nginx
     restart: unless-stopped
     ports:
@@ -83,7 +83,7 @@ services:
 
   ldap:
     container_name: cicd-ldap
-    image: osixia/openldap:latest 
+    image: osixia/openldap:1.5.0
     environment:
       LDAP_ORGANISATION: "Example Corp"
       LDAP_DOMAIN: "example.com"
@@ -107,7 +107,7 @@ services:
 
   ldapadmin:
     container_name: cicd-ldapadmin
-    image: osixia/phpldapadmin:latest
+    image: osixia/phpldapadmin:1.5.0
     environment:
       PHPLDAPADMIN_LDAP_HOSTS: ldap
       PHPLDAPADMIN_HTTPS: false
@@ -122,7 +122,7 @@ services:
 
   mailhog:
     container_name: mailhog
-    image: mailhog/mailhog
+    image: mailhog/mailhog:v1.0.1
     volumes:
       - mailhog_data:/data
     ports:
