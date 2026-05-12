@@ -166,6 +166,8 @@ echo ""
 # ============================================
 echo -e "${YELLOW}[9/10] CA 인증서 배치...${NC}"
 cp ca.crt ../../ldap/certs
+cp ldap/ldap.crt ../../ldap/certs
+cp ldap/ldap.key ../../ldap/certs
 cp ca.crt ../../jenkins/certs
 cp ca.crt ../../rundeck/certs
 cp ca.crt ../../nexus/certs
