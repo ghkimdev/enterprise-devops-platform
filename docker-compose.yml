@@ -74,6 +74,8 @@ services:
     hostname: svn.example.com
     container_name: svn
     restart: unless-stopped
+    env_file:
+      - .env 
     volumes:
       - ./svn/repos:/var/svn/repos
     networks:
