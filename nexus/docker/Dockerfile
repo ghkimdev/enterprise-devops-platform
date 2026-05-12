@@ -13,7 +13,7 @@ RUN apk add --no-cache ca-certificates \
 RUN keytool -importcert -noprompt \
   -alias self-ca \
   -file /usr/local/share/ca-certificates/self-ca.crt \
-  -keystore /usr/lib/jvm/java-21-openjdk/lib/security/cacerts \
+  -keystore /usr/lib/jvm/java-25-openjdk/lib/security/cacerts \
   -storepass changeit
 
 # 4. 권한 복구

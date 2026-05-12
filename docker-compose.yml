@@ -1,7 +1,7 @@
 services:
   nginx:
     image: nginx:1.29
-    container_name: cicd-nginx
+    container_name: nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -19,7 +19,7 @@ services:
       context: ./jenkins
       dockerfile: docker/Dockerfile
     hostname: jenkins.example.com
-    container_name: cicd-jenkins
+    container_name: jenkins
     restart: unless-stopped
     volumes:
       - jenkins_home:/var/jenkins_home
@@ -33,7 +33,7 @@ services:
       context: ./nexus
       dockerfile: docker/Dockerfile
     hostname: nexus.example.com
-    container_name: cicd-nexus
+    container_name: nexus
     restart: unless-stopped
     environment:
       INSTALL4J_ADD_VM_PARAMS: "-Xms2703m -Xmx2703m -XX:MaxDirectMemorySize=2703m"
@@ -49,7 +49,7 @@ services:
       context: ./rundeck
       dockerfile: docker/Dockerfile
     hostname: rundeck.example.com
-    container_name: cicd-rundeck
+    container_name: rundeck
     restart: unless-stopped
     environment:
       RUNDECK_GRAILS_URL: https://rundeck.example.com
@@ -72,17 +72,17 @@ services:
       context: ./svn
       dockerfile: docker/Dockerfile
     hostname: svn.example.com
-    container_name: cicd-svn
+    container_name: svn
     restart: unless-stopped
     volumes:
-      - ./repos:/var/svn/repos
+      - ./svn/repos:/var/svn/repos
     networks:
       - cicd-net
     depends_on:
       - ldap
 
   ldap:
-    container_name: cicd-ldap
+    container_name: ldap
     image: osixia/openldap:1.5.0
     environment:
       LDAP_ORGANISATION: "Example Corp"
@@ -96,7 +96,7 @@ services:
     volumes:
       - ldap_conf:/container/service/slapd
       - ldap_data:/var/lib/ldap
-      - ./ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom
+      - ./ldap/ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom
       - ./ldap/certs:/container/service/slapd/assets/certs
     ports:
       - "389:389"
@@ -106,7 +106,7 @@ services:
       - cicd-net
 
   ldapadmin:
-    container_name: cicd-ldapadmin
+    container_name: ldapadmin
     image: osixia/phpldapadmin:0.9.0
     environment:
       PHPLDAPADMIN_LDAP_HOSTS: ldap
