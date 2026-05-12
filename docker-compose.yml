@@ -131,16 +131,6 @@ services:
     networks:
       - cicd-net
 
-  pushgateway:
-    image: prom/pushgateway:latest
-    container_name: pushgateway
-    ports:
-      - "9091:9091"
-    restart: unless-stopped
-    networks:
-      - cicd-net
-
-
 # ── 네트워크 ──────────────────────────────────────────────────────────────────
 networks:
   cicd-net:
