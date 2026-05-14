@@ -1,0 +1,12 @@
+{
+  "id": "developer",
+  "name": "developer",
+  "description": "Developer Role",
+  "privileges": [
+    "nx-repository-view-maven2-*-read",
+    "nx-repository-view-maven2-*-browse",
+    "nx-repository-view-docker-*-read",
+    "nx-repository-view-docker-*-browse"
+  ],
+  "roles": []
+}

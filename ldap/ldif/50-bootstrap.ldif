@@ -13,6 +13,7 @@ ou: users
 # Define some users:
 dn: cn=admin, ou=users,{{ LDAP_BASE_DN }}
 uid: admin
+mail: admin@example.com
 userPassword: admin
 objectClass: person
 objectClass: top
@@ -22,6 +23,7 @@ cn: admin
 
 dn: cn=build, ou=users,{{ LDAP_BASE_DN }}
 uid: build
+mail: build@example.com
 userPassword: {MD5}sNonVSCRjiPdYV4qdHUo8Q==
 #####
 # MD5 creds, Base64 encoded
@@ -34,6 +36,7 @@ cn: build
 
 dn: cn=deploy, ou=users,{{ LDAP_BASE_DN }}
 uid: deploy
+mail: deploy@example.com
 userPassword: {CRYPT}de01JmlU8XXTQ
 #####
 # CRYPT creds
@@ -46,6 +49,7 @@ cn: deploy
 
 dn: cn=test, ou=users,{{ LDAP_BASE_DN }}
 uid: test
+mail: test@example.com
 userPassword: test
 objectClass: person
 objectClass: top
@@ -75,6 +79,12 @@ uniqueMember: cn=admin,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=deploy,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=build,ou=users,{{ LDAP_BASE_DN }}
 cn: user
+
+dn: cn=developer, ou=roles,{{ LDAP_BASE_DN }}
+objectClass: groupOfUniqueNames
+uniqueMember: cn=build,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=deploy,ou=users,{{ LDAP_BASE_DN }}
+cn: developer
 
 dn: cn=build, ou=roles,{{ LDAP_BASE_DN }}
 objectClass: groupOfUniqueNames

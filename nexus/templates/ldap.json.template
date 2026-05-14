@@ -29,8 +29,8 @@
   "groupBaseDn": "${LDAP_ROLE_BASE}",
   "groupSubtree": true,
 
-  "groupObjectClass": "groupOfNames",
+  "groupObjectClass": "groupOfUniqueNames",
   "groupIdAttribute": "cn",
-  "groupMemberAttribute": "member",
-  "groupMemberFormat": "uid=${username},${LDAP_USER_BASE},${LDAP_BASE_DN}"
+  "groupMemberAttribute": "uniqueMember",
+  "groupMemberFormat": "cn=${username},${LDAP_USER_BASE},${LDAP_BASE_DN}"
 }

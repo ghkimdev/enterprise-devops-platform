@@ -1,0 +1,9 @@
+{
+  "id": "admin",
+  "name": "admin",
+  "description": "Custom Nexus Admin Role",
+  "privileges": [
+    "nx-all"
+  ],
+  "roles": []
+}

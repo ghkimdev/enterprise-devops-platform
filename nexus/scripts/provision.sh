@@ -1,10 +1,32 @@
 #!/bin/sh
-set -e
+set -eu
 
-NEXUS_URL=http://nexus:8081
-ADMIN_USER=admin
+# -----------------------------------------------------------------------------
+# Nexus Bootstrap Provisioning Script
+#
+# Responsibilities
+#   - Wait for Nexus startup
+#   - Configure LDAP integration
+#   - Create blob stores
+#   - Create repositories
+#   - Configure security realms
+#   - Create Nexus roles
+#
+# Design Goals
+#   - Idempotent
+#   - Re-runnable
+#   - CI/CD friendly
+#   - Clear logging
+# -----------------------------------------------------------------------------
 
-echo "Waiting for admin password..."
+NEXUS_URL="http://nexus:8081"
+ADMIN_USER="admin"
+
+# -----------------------------------------------------------------------------
+# Wait for admin password initialization
+# -----------------------------------------------------------------------------
+
+echo "[INFO] Waiting for Nexus admin password..."
 
 until [ -f /nexus-data/admin.password ]; do
     sleep 3
@@ -12,13 +34,105 @@ done
 
 ADMIN_PASS=$(cat /nexus-data/admin.password)
 
-echo "Waiting for Nexus API..."
+# -----------------------------------------------------------------------------
+# Wait for Nexus REST API readiness
+# -----------------------------------------------------------------------------
 
-until curl -sf ${NEXUS_URL}/service/rest/v1/status > /dev/null; do
+echo "[INFO] Waiting for Nexus API..."
+
+until curl -sf "${NEXUS_URL}/service/rest/v1/status" > /dev/null; do
     sleep 5
 done
 
-echo "Generating LDAP configuration..."
+echo "[INFO] Nexus API is ready"
+
+# -----------------------------------------------------------------------------
+# Generic REST API wrapper
+# -----------------------------------------------------------------------------
+
+api_request() {
+    local method=$1
+    local endpoint=$2
+    local payload=${3:-}
+
+    echo "[INFO] ${method} ${endpoint}"
+
+    if [ -n "${payload}" ]; then
+        HTTP_CODE=$(curl -s \
+            -o /tmp/response.json \
+            -w "%{http_code}" \
+            -u "${ADMIN_USER}:${ADMIN_PASS}" \
+            -X "${method}" \
+            -H "Content-Type: application/json" \
+            "${NEXUS_URL}${endpoint}" \
+            -d @"${payload}")
+    else
+        HTTP_CODE=$(curl -s \
+            -o /tmp/response.json \
+            -w "%{http_code}" \
+            -u "${ADMIN_USER}:${ADMIN_PASS}" \
+            -X "${method}" \
+            "${NEXUS_URL}${endpoint}")
+    fi
+
+    case "${HTTP_CODE}" in
+        200|201|204)
+            echo "[SUCCESS] ${endpoint}"
+            ;;
+
+        409)
+            echo "[SKIP] Resource already exists"
+            ;;
+
+        *)
+            echo "[ERROR] Request failed (${HTTP_CODE})"
+
+            if [ -s /tmp/response.json ]; then
+                cat /tmp/response.json
+            fi
+
+            exit 1
+            ;;
+    esac
+}
+
+# -----------------------------------------------------------------------------
+# Resource existence checks
+# -----------------------------------------------------------------------------
+
+blobstore_exists() {
+    curl -s \
+        -u "${ADMIN_USER}:${ADMIN_PASS}" \
+        "${NEXUS_URL}/service/rest/v1/blobstores" \
+    | jq -e ".[] | select(.name == \"$1\")" > /dev/null
+}
+
+repository_exists() {
+    curl -s \
+        -u "${ADMIN_USER}:${ADMIN_PASS}" \
+        "${NEXUS_URL}/service/rest/v1/repositories" \
+    | jq -e ".[] | select(.name == \"$1\")" > /dev/null
+}
+
+role_exists() {
+    curl -s \
+        -u "${ADMIN_USER}:${ADMIN_PASS}" \
+        "${NEXUS_URL}/service/rest/v1/security/roles" \
+    | jq -e ".[] | select(.id == \"$1\")" > /dev/null
+}
+
+ldap_exists() {
+    curl -s \
+        -u "${ADMIN_USER}:${ADMIN_PASS}" \
+        "${NEXUS_URL}/service/rest/v1/security/ldap" \
+    | jq -e ".[] | select(.name == \"LDAP\")" > /dev/null
+}
+
+# -----------------------------------------------------------------------------
+# Generate LDAP configuration
+# -----------------------------------------------------------------------------
+
+echo "[INFO] Generating LDAP configuration..."
 
 envsubst '
 ${LDAP_HOST}
@@ -28,14 +142,138 @@ ${LDAP_BIND_DN}
 ${LDAP_BIND_PASSWORD}
 ${LDAP_USER_BASE}
 ${LDAP_ROLE_BASE}
-' < templates/ldap.json.template > /tmp/ldap.json
+' < /templates/ldap.json.template > /tmp/ldap.json
 
-echo "Provisioning LDAP..."
+# -----------------------------------------------------------------------------
+# Blob Store Provisioning
+# -----------------------------------------------------------------------------
 
-curl --fail -v -u ${ADMIN_USER}:${ADMIN_PASS} \
-  -X POST \
-  -H "Content-Type: application/json" \
-  ${NEXUS_URL}/service/rest/v1/security/ldap \
-  -d @/tmp/ldap.json
+echo "[INFO] Provisioning blob stores..."
 
-echo "LDAP provisioning completed"
+if blobstore_exists "maven-blob"; then
+    echo "[SKIP] maven-blob already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/blobstores/file" \
+        "/templates/blobstore-maven.json"
+fi
+
+if blobstore_exists "docker-blob"; then
+    echo "[SKIP] docker-blob already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/blobstores/file" \
+        "/templates/blobstore-docker.json"
+fi
+
+# -----------------------------------------------------------------------------
+# Docker Repository Provisioning
+# -----------------------------------------------------------------------------
+
+echo "[INFO] Provisioning Docker repositories..."
+
+if repository_exists "docker-hosted"; then
+    echo "[SKIP] docker-hosted already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/repositories/docker/hosted" \
+        "/templates/docker-hosted.json"
+fi
+
+if repository_exists "docker-hub"; then
+    echo "[SKIP] docker-hub already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/repositories/docker/proxy" \
+        "/templates/docker-proxy.json"
+fi
+
+# -----------------------------------------------------------------------------
+# npm Repository Provisioning
+# -----------------------------------------------------------------------------
+
+echo "[INFO] Provisioning npm repository..."
+
+if repository_exists "npm-proxy"; then
+    echo "[SKIP] npm-proxy already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/repositories/npm/proxy" \
+        "/templates/npm-proxy.json"
+fi
+
+# -----------------------------------------------------------------------------
+# PyPI Repository Provisioning
+# -----------------------------------------------------------------------------
+
+echo "[INFO] Provisioning PyPI repository..."
+
+if repository_exists "pypi-proxy"; then
+    echo "[SKIP] pypi-proxy already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/repositories/pypi/proxy" \
+        "/templates/pypi-proxy.json"
+fi
+
+# -----------------------------------------------------------------------------
+# Enable Security Realms
+# -----------------------------------------------------------------------------
+
+echo "[INFO] Configuring security realms..."
+
+api_request \
+    PUT \
+    "/service/rest/v1/security/realms/active" \
+    "/templates/realm.json"
+
+# -----------------------------------------------------------------------------
+# Nexus Role Provisioning
+# -----------------------------------------------------------------------------
+
+echo "[INFO] Provisioning Nexus roles..."
+
+if role_exists "developer"; then
+    echo "[SKIP] developer role already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/security/roles" \
+        "/templates/role-developer.json"
+fi
+
+if role_exists "admin"; then
+    echo "[SKIP] admin role already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/security/roles" \
+        "/templates/role-admin.json"
+fi
+
+# -----------------------------------------------------------------------------
+# LDAP Provisioning
+# -----------------------------------------------------------------------------
+
+echo "[INFO] Provisioning LDAP..."
+
+if ldap_exists; then
+    echo "[SKIP] LDAP already configured"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/security/ldap" \
+        "/tmp/ldap.json"
+fi
+
+# -----------------------------------------------------------------------------
+# Provisioning completed
+# -----------------------------------------------------------------------------
+
+echo "[SUCCESS] Nexus bootstrap provisioning completed"
