@@ -11,9 +11,13 @@ services:
       - ./nginx/certs:/etc/nginx/certs
     networks:
       - cicd-net
-    depends_on:
-      - jenkins
-        
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+ 
   jenkins:
     build:
       context: ./jenkins
@@ -25,11 +29,19 @@ services:
       - .env
     volumes:
       - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - cicd-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/login >/dev/null || wget -q --spider http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     depends_on:
-      - ldap
-
+      ldap:
+        condition: service_healthy
+ 
   nexus:
     build:
       context: ./nexus
@@ -45,8 +57,15 @@ services:
       - nexus_data:/nexus-data
     networks:
       - cicd-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/service/rest/v1/status >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
     depends_on:
-      - ldap
+      ldap:
+        condition: service_healthy
 
   nexus-init:
     image: alpine:3.23
@@ -87,8 +106,15 @@ services:
       - rundeck_data:/home/rundeck/server/data
     networks:
       - cicd-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null -w '%{http_code}' http://localhost:4440/ | grep -qE '200|302'"]
+      interval: 30s
+      timeout: 10s
+      retries: 8
+      start_period: 90s
     depends_on:
-      - ldap
+      ldap:
+        condition: service_healthy
 
   svn:
     build: 
@@ -105,8 +131,15 @@ services:
       - ./svn/hooks:/hooks
     networks:
       - cicd-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null -w '%{http_code}' http://localhost/ | grep -qE '200|401|403' || nc -z localhost 80"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
-      - ldap
+      ldap:
+        condition: service_healthy
 
   ldap:
     container_name: ldap
@@ -121,31 +154,38 @@ services:
       LDAP_TLS_CA_CRT_FILENAME: ${LDAP_TLS_CA_CRT_FILENAME}
       LDAP_TLS_VERIFY_CLIENT: never
     volumes:
-      - ldap_conf:/container/service/slapd
       - ldap_data:/var/lib/ldap
       - ./ldap/ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom
       - ./ldap/certs:/container/service/slapd/assets/certs
-    ports:
-      - "389:389"
-      - "636:636"
     command: --copy-service
     networks:
       - cicd-net
-
+    healthcheck:
+      test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -b '' -s base '(objectclass=*)' >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+ 
   ldapadmin:
     container_name: ldapadmin
     image: osixia/phpldapadmin:0.9.0
     environment:
       PHPLDAPADMIN_LDAP_HOSTS: ldap
       PHPLDAPADMIN_HTTPS: false
-    volumes:
-      - ldapadmin_conf:/container/service/phpldapadmin
     ports:
       - "8080:80"
     networks:
       - cicd-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://localhost/ || wget -q --spider http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     depends_on:
-      - ldap
+      ldap:
+        condition: service_healthy
 
   mailhog:
     container_name: mailhog
@@ -171,8 +211,5 @@ volumes:
   jenkins_home:
   nexus_data:
   rundeck_data:
-  svn_repos:
-  ldap_conf:
   ldap_data:
-  ldapadmin_conf:
   mailhog_data:
