@@ -7,6 +7,7 @@ COPY certs/ca.crt /usr/local/share/ca-certificates/self-ca.crt
 
 # 2. OS trust store 업데이트
 RUN apt-get update && apt-get install -y ca-certificates \
+    docker.io \
     && update-ca-certificates
 
 # 3. Java truststore에 CA 등록
@@ -24,7 +25,7 @@ RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
 # 5. 권한 복구
 USER jenkins
 
-# 6. Jenkins - LDAP 연동
-COPY casc/jenkins.yaml /var/jenkins_home/casc_configs/jenkins.yaml
+# 6. Jenkins Bootstrap 
+COPY casc/ /var/jenkins_home/casc_configs/
 
-ENV CASC_JENKINS_CONFIG=/var/jenkins_home/casc_configs/jenkins.yaml
+ENV CASC_JENKINS_CONFIG=/var/jenkins_home/casc_configs

@@ -12,3 +12,5 @@ timestamper:1.30
 workflow-aggregator:608.v67378e9d3db_1
 ws-cleanup:0.49
 configuration-as-code:2077.v41f1011a_5110
+subversion:1303.vcfd9679fb_c12
+docker-workflow:634.vedc7242b_eda_7

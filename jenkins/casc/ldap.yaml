@@ -11,7 +11,6 @@ jenkins:
           groupSearchBase: "${LDAP_ROLE_BASE}"
           managerDN: "${LDAP_BIND_DN}"
           managerPasswordSecret: "${LDAP_BIND_PASSWORD}"
-
   authorizationStrategy:
     loggedInUsersCanDoAnything:
       allowAnonymousRead: false
