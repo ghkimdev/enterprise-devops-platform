@@ -14,3 +14,5 @@ ws-cleanup:0.49
 configuration-as-code:2077.v41f1011a_5110
 subversion:1303.vcfd9679fb_c12
 docker-workflow:634.vedc7242b_eda_7
+role-strategy:848.va_a_ea_673cf0b_c
+parameterized-trigger:893.va_383a_9b_a_4c11

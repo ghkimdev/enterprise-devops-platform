@@ -26,6 +26,6 @@ RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
 USER jenkins
 
 # 6. Jenkins Bootstrap 
-COPY casc/ /var/jenkins_home/casc_configs/
+COPY casc/jenkins.yaml /var/jenkins_home/casc_configs/jenkins.yaml
 
-ENV CASC_JENKINS_CONFIG=/var/jenkins_home/casc_configs
+ENV CASC_JENKINS_CONFIG=/var/jenkins_home/casc_configs/jenkins.yaml

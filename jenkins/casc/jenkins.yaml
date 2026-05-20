@@ -1,0 +1,66 @@
+jenkins:
+  systemMessage: "Legacy CI/CD Pipeline"
+  securityRealm:
+    ldap:
+      configurations:
+        - server: "${LDAP_URL}"
+          rootDN: "${LDAP_BASE_DN}"
+          userSearchBase: "${LDAP_USER_BASE}"
+          userSearch: "uid={0}"
+          groupSearchBase: "${LDAP_ROLE_BASE}"
+          managerDN: "${LDAP_BIND_DN}"
+          managerPasswordSecret: "${LDAP_BIND_PASSWORD}"
+  authorizationStrategy:
+    projectMatrix:
+      entries:
+        - group:
+            name: "authenticated"
+            permissions:
+              - "View/Delete"
+              - "View/Read"
+              - "View/Configure"
+              - "View/Create"
+              - "Job/Read"
+              - "Job/Build"
+              - "Job/Configure"
+              - "Job/Create"
+              - "Job/Delete"
+              - "Job/Discover"
+              - "Job/Move"
+              - "Job/Workspace"
+              - "Job/Cancel"
+              - "Run/Delete"
+              - "Run/Replay"
+              - "Run/Update"
+              - "SCM/Tag"
+              - "Overall/Administer"
+        - user:
+            name: "anonymous"
+            permissions:
+              - "Overall/Read"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              id: svn-creds
+              username: "admin"
+              password: "admin"
+              description: "SVN Admin Account"
+
+          - usernamePassword:
+              id: nexus-creds
+              username: "admin"
+              password: "admin"
+              description: "Nexus Admin Account"
+
+unclassified:
+  location:
+    url: "https://jenkins.example.com"
+    adminAddress: "admin@example.com"
+
+  mailer:
+    smtpHost: "mailhog"
+    smtpPort: "1025"
+
