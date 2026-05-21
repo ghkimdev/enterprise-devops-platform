@@ -2,7 +2,7 @@
   "name": "pypi-proxy",
   "online": true,
   "storage": {
-    "blobStoreName": "maven-blob",
+    "blobStoreName": "pypi-blob",
     "strictContentTypeValidation": true
   },
   "proxy": {

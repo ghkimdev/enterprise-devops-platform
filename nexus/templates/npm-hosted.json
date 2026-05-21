@@ -1,0 +1,9 @@
+{
+  "name": "npm-hosted",
+  "online": true,
+  "storage": {
+    "blobStoreName": "npm-blob",
+    "strictContentTypeValidation": true,
+    "writePolicy": "ALLOW_ONCE"
+  }
+}

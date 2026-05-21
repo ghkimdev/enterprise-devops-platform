@@ -168,6 +168,24 @@ else
         "/templates/blobstore-docker.json"
 fi
 
+if blobstore_exists "pypi-blob"; then
+    echo "[SKIP] pypi-blob already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/blobstores/file" \
+        "/templates/blobstore-pypi.json"
+fi
+
+if blobstore_exists "npm-blob"; then
+    echo "[SKIP] npm-blob already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/blobstores/file" \
+        "/templates/blobstore-npm.json"
+fi
+
 # -----------------------------------------------------------------------------
 # Docker Repository Provisioning
 # -----------------------------------------------------------------------------
@@ -192,11 +210,28 @@ else
         "/templates/docker-proxy.json"
 fi
 
+if repository_exists "docker-group"; then
+    echo "[SKIP] docker-group already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/repositories/docker/group" \
+        "/templates/docker-group.json"
+fi
 # -----------------------------------------------------------------------------
 # npm Repository Provisioning
 # -----------------------------------------------------------------------------
 
 echo "[INFO] Provisioning npm repository..."
+
+if repository_exists "npm-hosted"; then
+    echo "[SKIP] npm-hosted already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/repositories/npm/hosted" \
+        "/templates/npm-hosted.json"
+fi
 
 if repository_exists "npm-proxy"; then
     echo "[SKIP] npm-proxy already exists"
@@ -207,11 +242,27 @@ else
         "/templates/npm-proxy.json"
 fi
 
-# -----------------------------------------------------------------------------
-# PyPI Repository Provisioning
+if repository_exists "npm-group"; then
+    echo "[SKIP] npm-group already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/repositories/npm/group" \
+        "/templates/npm-group.json"
+fi
+
 # -----------------------------------------------------------------------------
 
 echo "[INFO] Provisioning PyPI repository..."
+
+if repository_exists "pypi-hosted"; then
+    echo "[SKIP] pypi-hosted already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/repositories/pypi/hosted" \
+        "/templates/pypi-hosted.json"
+fi
 
 if repository_exists "pypi-proxy"; then
     echo "[SKIP] pypi-proxy already exists"
@@ -220,6 +271,15 @@ else
         POST \
         "/service/rest/v1/repositories/pypi/proxy" \
         "/templates/pypi-proxy.json"
+fi
+
+if repository_exists "pypi-group"; then
+    echo "[SKIP] pypi-group already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/repositories/pypi/group" \
+        "/templates/pypi-group.json"
 fi
 
 # -----------------------------------------------------------------------------

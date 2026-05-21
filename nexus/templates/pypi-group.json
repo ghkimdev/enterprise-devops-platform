@@ -1,0 +1,15 @@
+{
+  "name": "pypi-group",
+  "online": true,
+  "storage": {
+    "blobStoreName": "pypi-blob",
+    "strictContentTypeValidation": true
+  },
+  "group": {
+    "memberNames": [
+      "pypi-hosted",
+      "pypi-proxy"
+    ]
+  },
+  "type": "group"
+}

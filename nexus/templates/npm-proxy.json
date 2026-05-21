@@ -2,7 +2,7 @@
   "name": "npm-proxy",
   "online": true,
   "storage": {
-    "blobStoreName": "maven-blob",
+    "blobStoreName": "npm-blob",
     "strictContentTypeValidation": true
   },
   "proxy": {

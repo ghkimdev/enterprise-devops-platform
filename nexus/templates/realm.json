@@ -1,5 +1,6 @@
 [
     "NexusAuthenticatingRealm",
     "DockerToken",
-    "LdapRealm"
+    "LdapRealm",
+    "NpmToken"
 ]
