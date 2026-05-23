@@ -156,6 +156,7 @@ services:
       LDAP_TLS_CA_CRT_FILENAME: ${LDAP_TLS_CA_CRT_FILENAME}
       LDAP_TLS_VERIFY_CLIENT: never
     volumes:
+      - ldap_conf:/etc/ldap/slapd.d
       - ldap_data:/var/lib/ldap
       - ./ldap/ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom
       - ./ldap/certs:/container/service/slapd/assets/certs
@@ -213,5 +214,6 @@ volumes:
   jenkins_home:
   nexus_data:
   rundeck_data:
+  ldap_conf:
   ldap_data:
   mailhog_data:
