@@ -22,10 +22,15 @@ COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 
 RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
 
+# 6. Jenkins Bootstrap 
+COPY casc/ /var/jenkins_home/casc_configs/
+COPY seed/ /var/jenkins_home/seed/
+
+RUN chown -R jenkins:jenkins \
+    /var/jenkins_home/casc_configs \
+    /var/jenkins_home/seed
+
+ENV CASC_JENKINS_CONFIG=/var/jenkins_home/casc_configs
+
 # 5. 권한 복구
 USER jenkins
-
-# 6. Jenkins Bootstrap 
-COPY casc/jenkins.yaml /var/jenkins_home/casc_configs/jenkins.yaml
-
-ENV CASC_JENKINS_CONFIG=/var/jenkins_home/casc_configs/jenkins.yaml

@@ -16,3 +16,5 @@ subversion:1303.vcfd9679fb_c12
 docker-workflow:634.vedc7242b_eda_7
 role-strategy:848.va_a_ea_673cf0b_c
 parameterized-trigger:893.va_383a_9b_a_4c11
+job-dsl:3654.vdf58f53e2d15
+cloudbees-folder:6.1100.ve9eed61d16c4

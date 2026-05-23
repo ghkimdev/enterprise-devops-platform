@@ -1,5 +1,6 @@
 jenkins:
   systemMessage: "Legacy CI/CD Pipeline"
+  numExecutors: 5
   securityRealm:
     ldap:
       configurations:
@@ -38,6 +39,8 @@ jenkins:
             name: "anonymous"
             permissions:
               - "Overall/Read"
+jobs:
+  - file: /var/jenkins_home/seed/seed.groovy
 
 credentials:
   system:
@@ -55,6 +58,10 @@ credentials:
               password: "admin"
               description: "Nexus Admin Account"
 
+          - string:
+              id: "npm-token"
+              secret: "YWRtaW46YWRtaW4="
+              description: "npm-token"
 unclassified:
   location:
     url: "https://jenkins.example.com"
