@@ -7,23 +7,22 @@
 <settings>
     <servers>
         <server>
-            <id>nexus-releases</id>
+            <id>maven-releases</id>
             <username>${env.NEXUS_USER}</username>
             <password>${env.NEXUS_PASS}</password>
         </server>
         <server>
-            <id>nexus-snapshots</id>
+            <id>maven-snapshots</id>
             <username>${env.NEXUS_USER}</username>
             <password>${env.NEXUS_PASS}</password>
         </server>
     </servers>
 
     <mirrors>
-        <!-- 모든 외부 maven 요청을 Nexus proxy 로 -->
         <mirror>
-            <id>nexus-public</id>
+            <id>maven-public</id>
             <mirrorOf>*</mirrorOf>
-            <url>http://nexus.example.com/repository/maven-public/</url>
+            <url>http://nexus:8081/repository/maven-public/</url>
         </mirror>
     </mirrors>
 </settings>

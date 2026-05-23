@@ -4,11 +4,13 @@ USER root
 
 RUN apt-get update && \
     apt-get install -y \
+        docker.io \
         git \
         subversion \
         curl \
         unzip  \
         openjdk-21-jdk \
-        maven
+        maven \
+        && rm -rf /var/lib/apt/lists/*
 
 USER jenkins

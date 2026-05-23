@@ -1,0 +1,244 @@
+pipeline {
+
+    agent {
+        docker {
+            image 'spring-agent:1.0'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
+
+    parameters {
+
+        string(
+            name: 'APP_VERSION',
+            defaultValue: '',
+            description: 'Docker image tag'
+        )
+
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['dev', 'stg', 'prod'],
+            description: 'Deploy target environment'
+        )
+    }
+
+    environment {
+
+        APP_NAME = 'sample-spring'
+
+        NEXUS_DOCKER = 'nexus:5000'
+
+        IMAGE_NAME = "${NEXUS_DOCKER}/${APP_NAME}"
+
+        RUNDECK_URL = 'http://rundeck:4440'
+
+        RUNDECK_DEPLOY_JOB_ID =
+            'bbbbbbbb-1111-2222-3333-cccccccccccc'
+    }
+
+    options {
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+        disableConcurrentBuilds()
+    }
+
+    stages {
+
+        stage('Validate Parameters') {
+
+            steps {
+
+                script {
+
+                    if (!params.APP_VERSION?.trim()) {
+                        error 'APP_VERSION is required'
+                    }
+
+                    env.APP_VERSION = params.APP_VERSION
+
+                    env.TARGET_ENV = params.TARGET_ENV
+
+                    env.FULL_IMAGE =
+                        "${env.IMAGE_NAME}:${env.APP_VERSION}"
+
+                    currentBuild.displayName =
+                        "#${env.BUILD_NUMBER} ${env.TARGET_ENV} -> ${env.APP_VERSION}"
+
+                    echo "APP_VERSION=${env.APP_VERSION}"
+                    echo "TARGET_ENV=${env.TARGET_ENV}"
+                    echo "FULL_IMAGE=${env.FULL_IMAGE}"
+                }
+            }
+        }
+
+        stage('Approval (prod only)') {
+
+            when {
+                expression {
+                    env.TARGET_ENV == 'prod'
+                }
+            }
+
+            steps {
+
+                timeout(time: 10, unit: 'MINUTES') {
+
+                    input(
+                        message:
+                            "Deploy ${env.APP_VERSION} to PROD?",
+                        ok: 'Deploy'
+                    )
+                }
+            }
+        }
+
+        stage('Verify Docker Image Exists') {
+
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-creds',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+
+                    sh """
+                        echo "$NEXUS_PASS" \
+                          | docker login ${NEXUS_DOCKER} \
+                              -u "$NEXUS_USER" \
+                              --password-stdin
+
+                        docker manifest inspect ${FULL_IMAGE} \
+                          > /dev/null
+                    """
+                }
+            }
+        }
+
+        stage('Deploy via Rundeck') {
+
+            steps {
+
+                script {
+
+                    def rundeck =
+                        load 'jenkins-pipelines/rundeck-helper.groovy'
+
+                    rundeck.runJob(
+                        jobId: env.RUNDECK_DEPLOY_JOB_ID,
+                        rundeckUrl: env.RUNDECK_URL,
+                        tokenCredentialId: 'rundeck-api-token',
+                        options: [
+                            app: env.APP_NAME,
+                            version: env.APP_VERSION,
+                            env: env.TARGET_ENV
+                        ],
+                        timeoutMin: 20
+                    )
+                }
+            }
+        }
+
+        stage('Health Check') {
+
+            steps {
+
+                script {
+
+                    def healthUrls = [
+
+                        dev:
+                            'http://dev.example.com:8080/actuator/health',
+
+                        stg:
+                            'http://stg.example.com:8080/actuator/health',
+
+                        prod:
+                            'http://prod.example.com:8080/actuator/health'
+                    ]
+
+                    def url =
+                        healthUrls[env.TARGET_ENV]
+
+                    retry(10) {
+
+                        sleep(time: 10, unit: 'SECONDS')
+
+                        sh """
+                            curl -fsS ${url} \
+                              | grep -q UP
+                        """
+                    }
+
+                    echo "HEALTH CHECK OK: ${url}"
+                }
+            }
+        }
+
+        stage('Generate Deploy Metadata') {
+
+            steps {
+
+                sh """
+                    cat > deploy-info.json <<EOF
+{
+  "app": "${APP_NAME}",
+  "app_version": "${APP_VERSION}",
+  "target_env": "${TARGET_ENV}",
+  "image": "${FULL_IMAGE}",
+  "build_number": "${BUILD_NUMBER}"
+}
+EOF
+                """
+
+                archiveArtifacts artifacts: '''
+                    deploy-info.json
+                ''',
+                fingerprint: true
+            }
+        }
+    }
+
+    post {
+
+        success {
+
+            echo """
+==================================================
+DEPLOY SUCCESS
+==================================================
+
+APP      : ${APP_NAME}
+VERSION  : ${APP_VERSION}
+ENV      : ${TARGET_ENV}
+IMAGE    : ${FULL_IMAGE}
+
+==================================================
+"""
+        }
+
+        failure {
+
+            echo """
+==================================================
+DEPLOY FAILED
+==================================================
+
+APP      : ${APP_NAME}
+VERSION  : ${APP_VERSION}
+ENV      : ${TARGET_ENV}
+
+==================================================
+"""
+        }
+
+        always {
+
+            sh """
+                docker logout ${NEXUS_DOCKER} || true
+            """
+
+            cleanWs()
+        }
+    }
+}

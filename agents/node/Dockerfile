@@ -9,9 +9,23 @@ RUN apt-get update && \
         subversion \
         curl \
         unzip \
-        python3 \
-        python3-pip \
-        python3-venv \
+        ca-certificates \
         && rm -rf /var/lib/apt/lists/*
+
+#
+# Node.js 20 LTS
+#
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs
+
+#
+# Pin npm version
+#
+RUN npm install -g npm@10
+
+#
+# Verify toolchain
+#
+RUN node -v && npm -v
 
 USER jenkins

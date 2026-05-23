@@ -1,0 +1,302 @@
+pipeline {
+
+    agent {
+        docker {
+            image 'fastapi-agent:1.0'
+            args '''
+                --network legacy-cicd-pipeline_cicd-net
+                -v /var/run/docker.sock:/var/run/docker.sock
+            '''
+        }
+    }
+
+    parameters {
+
+        string(
+            name: 'APP_VERSION',
+            defaultValue: '',
+            description: 'Immutable Docker image tag'
+        )
+
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['dev', 'stg', 'prod'],
+            description: 'Deploy target environment'
+        )
+    }
+
+    environment {
+
+        APP_NAME = 'sample-fastapi'
+
+        NEXUS_DOCKER =
+            'nexus.example.com:5000'
+
+        IMAGE_NAME =
+            "${NEXUS_DOCKER}/${APP_NAME}"
+
+        RUNDECK_URL =
+            'http://rundeck:4440'
+
+        RUNDECK_DEPLOY_JOB_ID =
+            'cccccccc-1111-2222-3333-cccccccccccc'
+    }
+
+    options {
+
+        timestamps()
+
+        buildDiscarder(
+            logRotator(numToKeepStr: '50')
+        )
+
+        disableConcurrentBuilds()
+    }
+
+    stages {
+
+        stage('Validate Parameters') {
+
+            steps {
+
+                script {
+
+                    if (!params.APP_VERSION?.trim()) {
+
+                        error 'APP_VERSION is required'
+                    }
+
+                    env.APP_VERSION =
+                        params.APP_VERSION
+
+                    env.TARGET_ENV =
+                        params.TARGET_ENV
+
+                    env.FULL_IMAGE =
+                        "${IMAGE_NAME}:${APP_VERSION}"
+
+                    currentBuild.displayName =
+                        "#${BUILD_NUMBER} ${TARGET_ENV} -> ${APP_VERSION}"
+
+                    echo """
+==================================================
+FASTAPI DEPLOY INFO
+==================================================
+
+APP_VERSION : ${APP_VERSION}
+TARGET_ENV  : ${TARGET_ENV}
+FULL_IMAGE  : ${FULL_IMAGE}
+
+==================================================
+"""
+                }
+            }
+        }
+
+        stage('Verify Immutable Image Exists') {
+
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-creds',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+
+                    sh """
+                        echo "$NEXUS_PASS" \
+                          | docker login ${NEXUS_DOCKER} \
+                              -u "$NEXUS_USER" \
+                              --password-stdin
+
+                        docker manifest inspect ${FULL_IMAGE} \
+                          > /dev/null
+                    """
+                }
+            }
+        }
+
+        stage('Approval (prod only)') {
+
+            when {
+
+                expression {
+
+                    env.TARGET_ENV == 'prod'
+                }
+            }
+
+            steps {
+
+                timeout(time: 10, unit: 'MINUTES') {
+
+                    input(
+                        message:
+                            "Deploy ${APP_VERSION} to PROD?",
+                        ok: 'Deploy'
+                    )
+                }
+            }
+        }
+
+        stage('Deploy via Rundeck') {
+
+            steps {
+
+                script {
+
+                    def rundeck =
+                        load 'jenkins-pipelines/rundeck-helper.groovy'
+
+                    rundeck.runJob(
+                        jobId: env.RUNDECK_DEPLOY_JOB_ID,
+                        rundeckUrl: env.RUNDECK_URL,
+                        tokenCredentialId: 'rundeck-api-token',
+                        options: [
+                            app: env.APP_NAME,
+                            version: env.APP_VERSION,
+                            env: env.TARGET_ENV
+                        ],
+                        timeoutMin: 20
+                    )
+                }
+            }
+        }
+
+        stage('Health Check') {
+
+            steps {
+
+                script {
+
+                    def healthUrls = [
+
+                        dev:
+                            'http://dev.example.com:8000/healthz',
+
+                        stg:
+                            'http://stg.example.com:8000/healthz',
+
+                        prod:
+                            'http://prod.example.com:8000/healthz'
+                    ]
+
+                    def healthUrl =
+                        healthUrls[env.TARGET_ENV]
+
+                    retry(12) {
+
+                        sleep(time: 5, unit: 'SECONDS')
+
+                        sh """
+                            curl -fsS ${healthUrl}
+                        """
+                    }
+
+                    echo """
+==================================================
+HEALTH CHECK SUCCESS
+==================================================
+
+${healthUrl}
+
+==================================================
+"""
+                }
+            }
+        }
+
+        stage('Smoke Test') {
+
+            steps {
+
+                script {
+
+                    def smokeUrls = [
+
+                        dev:
+                            'http://dev.example.com:8000/docs',
+
+                        stg:
+                            'http://stg.example.com:8000/docs',
+
+                        prod:
+                            'http://prod.example.com:8000/docs'
+                    ]
+
+                    sh """
+                        curl -fsS \
+                          ${smokeUrls[env.TARGET_ENV]} \
+                          > /dev/null
+                    """
+                }
+            }
+        }
+
+        stage('Generate Deployment Metadata') {
+
+            steps {
+
+                sh """
+cat > deploy-info.json <<EOF
+{
+  "app": "${APP_NAME}",
+  "app_version": "${APP_VERSION}",
+  "target_env": "${TARGET_ENV}",
+  "image": "${FULL_IMAGE}",
+  "build_number": "${BUILD_NUMBER}"
+}
+EOF
+                """
+
+                archiveArtifacts(
+                    artifacts: 'deploy-info.json',
+                    fingerprint: true
+                )
+            }
+        }
+    }
+
+    post {
+
+        success {
+
+            echo """
+==================================================
+FASTAPI DEPLOY SUCCESS
+==================================================
+
+APP      : ${APP_NAME}
+VERSION  : ${APP_VERSION}
+ENV      : ${TARGET_ENV}
+IMAGE    : ${FULL_IMAGE}
+
+==================================================
+"""
+        }
+
+        failure {
+
+            echo """
+==================================================
+FASTAPI DEPLOY FAILED
+==================================================
+
+APP      : ${APP_NAME}
+VERSION  : ${APP_VERSION}
+ENV      : ${TARGET_ENV}
+
+==================================================
+"""
+        }
+
+        always {
+
+            sh '''
+                docker logout ${NEXUS_DOCKER} || true
+            '''
+
+            cleanWs()
+        }
+    }
+}

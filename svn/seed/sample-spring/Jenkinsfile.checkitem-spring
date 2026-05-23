@@ -1,0 +1,298 @@
+pipeline {
+
+    agent {
+        docker {
+            image 'spring-agent:1.0'
+            args '''
+                --network legacy-cicd-pipeline_cicd-net
+                -v /var/run/docker.sock:/var/run/docker.sock
+            '''
+        }
+    }
+
+    parameters {
+
+        string(
+            name: 'BASE_TAG',
+            defaultValue: '',
+            description: 'optional base release tag'
+        )
+    }
+
+    environment {
+
+        APP_NAME = 'sample-spring'
+
+        SVN_BASE = "http://svn/svn/${APP_NAME}"
+
+        SVN_TRUNK = "${SVN_BASE}/trunk"
+
+        SVN_TAGS = "${SVN_BASE}/tags"
+    }
+
+    options {
+
+        timestamps()
+
+        buildDiscarder(
+            logRotator(numToKeepStr: '30')
+        )
+
+        disableConcurrentBuilds()
+    }
+
+    stages {
+
+        stage('Checkout Trunk') {
+
+            steps {
+
+                cleanWs()
+
+                checkout([
+                    $class: 'SubversionSCM',
+                    locations: [[
+                        credentialsId: 'svn-creds',
+                        remote: env.SVN_TRUNK,
+                        local: '.'
+                    ]],
+                    workspaceUpdater: [$class: 'CheckoutUpdater']
+                ])
+            }
+        }
+
+        stage('Collect Release Metadata') {
+
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'svn-creds',
+                    usernameVariable: 'SVN_USER',
+                    passwordVariable: 'SVN_PASS'
+                )]) {
+
+                    script {
+
+                        def latestTag = ''
+
+                        if (params.BASE_TAG?.trim()) {
+
+                            latestTag = params.BASE_TAG.trim()
+
+                            echo "USING BASE_TAG=${latestTag}"
+                        }
+                        else {
+
+                            latestTag = sh(
+                                returnStdout: true,
+                                script: """
+                                    set -e
+
+                                    svn list "${SVN_TAGS}" \
+                                      --username "\$SVN_USER" \
+                                      --password "\$SVN_PASS" \
+                                      --non-interactive \
+                                      --trust-server-cert \
+                                    | tail -1 \
+                                    | sed 's#/##'
+                                """
+                            ).trim()
+                        }
+
+                        env.LATEST_TAG = latestTag
+
+                        if (!latestTag) {
+
+                            echo 'NO PREVIOUS RELEASE TAG'
+                            echo 'INITIAL RELEASE MODE'
+
+                            env.INITIAL_RELEASE = 'true'
+
+                            env.OLD_REVISION = '0'
+                        }
+                        else {
+
+                            env.INITIAL_RELEASE = 'false'
+
+                            def oldRevision = sh(
+                                returnStdout: true,
+                                script: """
+                                    set -e
+
+                                    svn info "${SVN_TAGS}/${latestTag}" \
+                                      --username "\$SVN_USER" \
+                                      --password "\$SVN_PASS" \
+                                      --non-interactive \
+                                      --trust-server-cert \
+                                    | grep '^Revision:' \
+                                    | awk '{print \$2}'
+                                """
+                            ).trim()
+
+                            env.OLD_REVISION = oldRevision
+                        }
+
+                        env.NEW_REVISION =
+                            env.SVN_REVISION ?: env.SVN_REVISION_1 ?: "0"
+
+                        currentBuild.displayName =
+                            "#${env.BUILD_NUMBER} r${env.NEW_REVISION}"
+
+                        echo "LATEST_TAG=${env.LATEST_TAG}"
+                        echo "INITIAL_RELEASE=${env.INITIAL_RELEASE}"
+                        echo "OLD_REVISION=${env.OLD_REVISION}"
+                        echo "NEW_REVISION=${env.NEW_REVISION}"
+                    }
+                }
+            }
+        }
+
+        stage('Generate CheckItem') {
+
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'svn-creds',
+                    usernameVariable: 'SVN_USER',
+                    passwordVariable: 'SVN_PASS'
+                )]) {
+
+                    script {
+
+                        sh """
+                            touch changed-files.txt
+                            touch commit-log.txt
+                            touch release-note.md
+                            touch checkitem.json
+                        """
+
+                        if (env.INITIAL_RELEASE == 'true') {
+
+                            sh """
+                                set -e
+
+                                svn list -R "${SVN_TRUNK}" \
+                                  --username "\$SVN_USER" \
+                                  --password "\$SVN_PASS" \
+                                  --non-interactive \
+                                  --trust-server-cert \
+                                  > changed-files.txt
+                            """
+
+                            sh """
+                                echo "INITIAL RELEASE" \
+                                  > commit-log.txt
+                            """
+                        }
+                        else {
+
+                            sh """
+                                set -e
+
+                                svn diff --summarize \
+                                  -r ${OLD_REVISION}:${NEW_REVISION} \
+                                  "${SVN_TRUNK}" \
+                                  --username "\$SVN_USER" \
+                                  --password "\$SVN_PASS" \
+                                  --non-interactive \
+                                  --trust-server-cert \
+                                  > changed-files.txt
+                            """
+
+                            sh """
+                                set -e
+
+                                svn log \
+                                  -r ${OLD_REVISION}:${NEW_REVISION} \
+                                  "${SVN_TRUNK}" \
+                                  --username "\$SVN_USER" \
+                                  --password "\$SVN_PASS" \
+                                  --non-interactive \
+                                  --trust-server-cert \
+                                  > commit-log.txt
+                            """
+                        }
+
+                        sh """
+                            cat > release-note.md <<EOF
+# Release Note
+
+## Application
+${APP_NAME}
+
+## Latest Tag
+${LATEST_TAG}
+
+## Old Revision
+${OLD_REVISION}
+
+## New Revision
+${NEW_REVISION}
+
+## Initial Release
+${INITIAL_RELEASE}
+
+## Changed Files
+
+EOF
+                        """
+
+                        sh """
+                            cat changed-files.txt \
+                              >> release-note.md
+                        """
+
+                        sh """
+                            cat > checkitem.json <<EOF
+{
+  "app": "${APP_NAME}",
+  "latest_tag": "${LATEST_TAG}",
+  "initial_release": "${INITIAL_RELEASE}",
+  "old_revision": "${OLD_REVISION}",
+  "new_revision": "${NEW_REVISION}"
+}
+EOF
+                        """
+
+                        archiveArtifacts(
+                            artifacts: 'changed-files.txt,commit-log.txt,release-note.md,checkitem.json',
+                            fingerprint: true,
+                            allowEmptyArchive: true
+                        )
+                        sh """
+                        echo "=============================="
+                        echo "CHANGED FILES"
+                        echo "=============================="
+
+                        cat changed-files.txt
+
+                        echo ""
+                        echo "=============================="
+                        echo "COMMIT LOG"
+                        echo "=============================="
+
+                        cat commit-log.txt
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+
+        success {
+
+            echo """
+==================================================
+CHECKITEM GENERATED
+==================================================
+"""
+        }
+
+        always {
+
+            cleanWs()
+        }
+    }
+}

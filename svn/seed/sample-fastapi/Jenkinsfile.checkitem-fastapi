@@ -1,0 +1,320 @@
+pipeline {
+
+    agent {
+        docker {
+            image 'python-agent:1.0'
+            args '''
+                --network legacy-cicd-pipeline_cicd-net
+                -v /var/run/docker.sock:/var/run/docker.sock
+            '''
+        }
+    }
+
+    environment {
+
+        APP_NAME = 'sample-fastapi'
+
+        SVN_BASE = "http://svn/svn/${APP_NAME}"
+
+        SVN_TRUNK = "${SVN_BASE}/trunk"
+
+        SVN_TAGS = "${SVN_BASE}/tags"
+    }
+
+    options {
+
+        timestamps()
+
+        buildDiscarder(
+            logRotator(numToKeepStr: '30')
+        )
+
+        disableConcurrentBuilds()
+    }
+
+    stages {
+
+        stage('Checkout Trunk') {
+
+            steps {
+
+                cleanWs()
+
+                checkout([
+                    $class: 'SubversionSCM',
+                    locations: [[
+                        credentialsId: 'svn-creds',
+                        remote: env.SVN_TRUNK,
+                        local: '.'
+                    ]],
+                    workspaceUpdater: [$class: 'CheckoutUpdater']
+                ])
+            }
+        }
+
+        stage('Collect Release Metadata') {
+
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'svn-creds',
+                    usernameVariable: 'SVN_USER',
+                    passwordVariable: 'SVN_PASS'
+                )]) {
+
+                    script {
+
+                        def latestTag = sh(
+                            returnStdout: true,
+                            script: """
+                                set -e
+
+                                svn list "${SVN_TAGS}" \
+                                  --username "$SVN_USER" \
+                                  --password "$SVN_PASS" \
+                                  --non-interactive \
+                                  --trust-server-cert \
+                                | tail -1 \
+                                | sed 's#/##'
+                            """
+                        ).trim()
+
+                        env.LATEST_TAG = latestTag
+
+                        if (!latestTag) {
+
+                            env.INITIAL_RELEASE = 'true'
+                            env.OLD_REVISION = '0'
+                        }
+                        else {
+
+                            env.INITIAL_RELEASE = 'false'
+
+                            env.OLD_REVISION = sh(
+                                returnStdout: true,
+                                script: """
+                                    svn info "${SVN_TAGS}/${latestTag}" \
+                                      --username "$SVN_USER" \
+                                      --password "$SVN_PASS" \
+                                      --non-interactive \
+                                      --trust-server-cert \
+                                    | grep '^Revision:' \
+                                    | awk '{print \$2}'
+                                """
+                            ).trim()
+                        }
+
+                        env.NEW_REVISION =
+                            env.SVN_REVISION ?: env.SVN_REVISION_1 ?: "0"
+
+                        currentBuild.displayName =
+                            "#${env.BUILD_NUMBER} r${env.NEW_REVISION}"
+                    }
+                }
+            }
+        }
+
+        stage('Generate Diff & Commit Log') {
+
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'svn-creds',
+                    usernameVariable: 'SVN_USER',
+                    passwordVariable: 'SVN_PASS'
+                )]) {
+
+                    script {
+
+                        sh '''
+                            touch changed-files.txt
+                            touch commit-log.txt
+                        '''
+
+                        if (env.INITIAL_RELEASE == 'true') {
+
+                            sh """
+                                svn list -R "${SVN_TRUNK}" \
+                                  --username "$SVN_USER" \
+                                  --password "$SVN_PASS" \
+                                  --non-interactive \
+                                  --trust-server-cert \
+                                  > changed-files.txt
+                            """
+
+                            sh '''
+                                echo "INITIAL RELEASE" \
+                                  > commit-log.txt
+                            '''
+                        }
+                        else {
+
+                            sh """
+                                svn diff --summarize \
+                                  -r ${OLD_REVISION}:${NEW_REVISION} \
+                                  "${SVN_TRUNK}" \
+                                  --username "$SVN_USER" \
+                                  --password "$SVN_PASS" \
+                                  --non-interactive \
+                                  --trust-server-cert \
+                                  > changed-files.txt
+                            """
+
+                            sh """
+                                svn log \
+                                  -r ${OLD_REVISION}:${NEW_REVISION} \
+                                  "${SVN_TRUNK}" \
+                                  --username "$SVN_USER" \
+                                  --password "$SVN_PASS" \
+                                  --non-interactive \
+                                  --trust-server-cert \
+                                  > commit-log.txt
+                            """
+                        }
+                    }
+                }
+            }
+        }
+        stage('Analyze Impact') {
+
+            steps {
+
+                script {
+
+                    def changedFiles =
+                        readFile('changed-files.txt')
+
+                    boolean dependencyChanged =
+                        changedFiles.contains('requirements.txt')
+
+                    boolean dockerChanged =
+                        changedFiles.contains('Dockerfile')
+
+                    boolean appChanged =
+                        changedFiles.contains('app/')
+
+                    boolean testChanged =
+                        changedFiles.contains('tests/')
+
+                    boolean fullRegression =
+                        dependencyChanged ||
+                        dockerChanged
+
+                    def impact = [
+                        dependency_changed: dependencyChanged,
+                        docker_changed: dockerChanged,
+                        app_changed: appChanged,
+                        test_changed: testChanged,
+                        requires_full_regression: fullRegression
+                    ]
+
+                    writeFile(
+                        file: 'impact-analysis.json',
+                        text: groovy.json.JsonOutput.prettyPrint(
+                            groovy.json.JsonOutput.toJson(impact)
+                        )
+                    )
+
+                    echo """
+==================================================
+FASTAPI IMPACT ANALYSIS
+==================================================
+
+dependency_changed       : ${dependencyChanged}
+docker_changed           : ${dockerChanged}
+app_changed              : ${appChanged}
+test_changed             : ${testChanged}
+requires_full_regression : ${fullRegression}
+
+==================================================
+"""
+                }
+            }
+        }
+
+        stage('Generate Release Note') {
+
+            steps {
+
+                sh """
+cat > release-note.md <<EOF
+# FastAPI Release Note
+
+## Application
+${APP_NAME}
+
+## Latest Tag
+${LATEST_TAG}
+
+## Old Revision
+${OLD_REVISION}
+
+## New Revision
+${NEW_REVISION}
+
+## Changed Files
+
+EOF
+                """
+
+                sh '''
+                    cat changed-files.txt \
+                      >> release-note.md
+                '''
+            }
+        }
+
+        stage('Generate Metadata') {
+
+            steps {
+
+                sh """
+cat > checkitem.json <<EOF
+{
+  "app": "${APP_NAME}",
+  "latest_tag": "${LATEST_TAG}",
+  "old_revision": "${OLD_REVISION}",
+  "new_revision": "${NEW_REVISION}",
+  "initial_release": "${INITIAL_RELEASE}"
+}
+EOF
+                """
+
+                archiveArtifacts(
+                    artifacts: '''
+                        changed-files.txt,
+                        commit-log.txt,
+                        release-note.md,
+                        checkitem.json,
+                        impact-analysis.json
+                    ''',
+                    fingerprint: true,
+                    allowEmptyArchive: true
+                )
+            }
+        }
+    }
+
+    post {
+
+        success {
+
+            echo """
+==================================================
+FASTAPI CHECKITEM COMPLETE
+==================================================
+
+APP            : ${APP_NAME}
+OLD_REVISION   : ${OLD_REVISION}
+NEW_REVISION   : ${NEW_REVISION}
+
+==================================================
+"""
+        }
+
+        always {
+
+            cleanWs()
+        }
+    }
+}

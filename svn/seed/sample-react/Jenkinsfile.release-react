@@ -1,0 +1,278 @@
+pipeline {
+
+    agent {
+        docker {
+            image 'node-agent:1.0'
+            args '''
+                --network legacy-cicd-pipeline_cicd-net
+            '''
+        }
+    }
+
+    parameters {
+
+        string(
+            name: 'RELEASE_NAME',
+            defaultValue: '',
+            description: 'optional custom release name'
+        )
+    }
+
+    environment {
+
+        APP_NAME = 'sample-react'
+
+        SVN_BASE = "http://svn/svn/${APP_NAME}"
+
+        SVN_TRUNK = "${SVN_BASE}/trunk"
+
+        SVN_TAGS = "${SVN_BASE}/tags"
+    }
+
+    options {
+
+        timestamps()
+
+        buildDiscarder(
+            logRotator(numToKeepStr: '30')
+        )
+
+        disableConcurrentBuilds()
+    }
+
+    stages {
+
+        stage('Checkout Trunk') {
+
+            steps {
+
+                cleanWs()
+
+                checkout([
+                    $class: 'SubversionSCM',
+                    locations: [[
+                        credentialsId: 'svn-creds',
+                        remote: env.SVN_TRUNK,
+                        local: '.'
+                    ]],
+                    workspaceUpdater: [$class: 'CheckoutUpdater']
+                ])
+            }
+        }
+
+        stage('Validate Release Readiness') {
+
+            steps {
+
+                script {
+
+                    if (!fileExists('package-lock.json')) {
+
+                        error '''
+package-lock.json does not exist.
+
+Immutable frontend build requires deterministic
+dependency resolution.
+
+Generate lockfile first:
+
+npm install
+svn add package-lock.json
+svn commit
+'''
+                    }
+
+                    echo 'package-lock.json detected'
+                }
+            }
+        }
+
+        stage('Prepare Release Info') {
+
+            steps {
+
+                script {
+                    env.SVN_REVISION = sh(
+                        returnStdout: true,
+                        script: """
+                           svn info ${SVN_TRUNK} \
+                              --non-interactive \
+                              --trust-server-cert \
+                            | grep '^Revision:' \
+                            | awk '{print \$2}'
+                    """
+                ).trim()
+
+                    def today =
+                        new Date().format("yyyyMMdd")
+
+                    def releaseName =
+                        params.RELEASE_NAME?.trim()
+                            ? params.RELEASE_NAME
+                            : "release-${today}-r${env.SVN_REVISION}"
+
+                    env.RELEASE_NAME = releaseName
+
+                    env.RELEASE_TAG =
+                        "${env.SVN_TAGS}/${releaseName}"
+
+                    currentBuild.displayName =
+                        "#${env.BUILD_NUMBER} ${releaseName}"
+
+                    echo "SVN_REVISION=${env.SVN_REVISION}"
+                    echo "RELEASE_NAME=${env.RELEASE_NAME}"
+                    echo "RELEASE_TAG=${env.RELEASE_TAG}"
+                }
+            }
+        }
+
+        stage('Verify Release Tag Does Not Exist') {
+
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'svn-creds',
+                    usernameVariable: 'SVN_USER',
+                    passwordVariable: 'SVN_PASS'
+                )]) {
+
+                    script {
+
+                        def tagExists = sh(
+                            returnStatus: true,
+                            script: """
+                                svn info "${RELEASE_TAG}" \
+                                  --username "$SVN_USER" \
+                                  --password "$SVN_PASS" \
+                                  --non-interactive \
+                                  --trust-server-cert \
+                                  > /dev/null 2>&1
+                            """
+                        )
+
+                        if (tagExists == 0) {
+
+                            error """
+Release tag already exists:
+
+${RELEASE_TAG}
+"""
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Create Immutable SVN Tag') {
+
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'svn-creds',
+                    usernameVariable: 'SVN_USER',
+                    passwordVariable: 'SVN_PASS'
+                )]) {
+
+                    sh """
+                        svn copy \
+                          ${SVN_TRUNK} \
+                          ${RELEASE_TAG} \
+                          -m "Create immutable react release ${RELEASE_NAME}" \
+                          --username "$SVN_USER" \
+                          --password "$SVN_PASS" \
+                          --non-interactive \
+                          --trust-server-cert
+                    """
+                }
+            }
+        }
+
+        stage('Generate Release Metadata') {
+
+            steps {
+
+                sh """
+                    cat > release-info.json <<EOF
+{
+  "app": "${APP_NAME}",
+  "release_name": "${RELEASE_NAME}",
+  "svn_revision": "${SVN_REVISION}",
+  "release_tag": "${RELEASE_TAG}",
+  "release_type": "immutable-react-release",
+  "build_number": "${BUILD_NUMBER}"
+}
+EOF
+                """
+
+                sh """
+                    cat > release-summary.md <<EOF
+# React Immutable Release
+
+## Application
+${APP_NAME}
+
+## Release Name
+${RELEASE_NAME}
+
+## SVN Revision
+${SVN_REVISION}
+
+## Release Tag
+${RELEASE_TAG}
+
+## Release Strategy
+Immutable frontend release tag
+
+## Build Strategy
+Build once deploy many
+
+## Artifact Strategy
+Immutable nginx frontend image
+
+EOF
+                """
+
+                archiveArtifacts(
+                    artifacts: '''
+                        release-info.json,
+                        release-summary.md
+                    ''',
+                    fingerprint: true
+                )
+            }
+        }
+    }
+
+    post {
+
+        success {
+
+            echo """
+==================================================
+IMMUTABLE REACT RELEASE CREATED
+==================================================
+
+APP            : ${APP_NAME}
+RELEASE_NAME   : ${RELEASE_NAME}
+SVN_REVISION   : ${SVN_REVISION}
+RELEASE_TAG    : ${RELEASE_TAG}
+
+==================================================
+"""
+
+            build job: 'sample-react-build',
+                  parameters: [
+                      string(
+                          name: 'RELEASE_NAME',
+                          value: env.RELEASE_NAME
+                      )
+                  ],
+                  wait: false
+        }
+
+        always {
+
+            cleanWs()
+        }
+    }
+}

@@ -1,0 +1,469 @@
+pipeline {
+
+    agent {
+        docker {
+            image 'node-agent:1.0'
+            args '''
+                --network legacy-cicd-pipeline_cicd-net
+                -v /var/run/docker.sock:/var/run/docker.sock
+            '''
+        }
+    }
+
+    parameters {
+
+        string(
+            name: 'RELEASE_NAME',
+            defaultValue: '',
+            description: 'SVN immutable release tag'
+        )
+    }
+
+    environment {
+
+        APP_NAME = 'sample-react'
+
+        SVN_BASE = "http://svn/svn/${APP_NAME}"
+
+        SVN_TAGS = "${SVN_BASE}/tags"
+
+        NEXUS_DOCKER = 'nexus.example.com:5000'
+
+        NEXUS_NPM_PROXY =
+            'http://nexus:8081/repository/npm-group/'
+
+        IMAGE_NAME =
+            "${NEXUS_DOCKER}/${APP_NAME}"
+    }
+
+    options {
+
+        timestamps()
+
+        buildDiscarder(
+            logRotator(numToKeepStr: '30')
+        )
+
+        disableConcurrentBuilds()
+    }
+
+    stages {
+
+        stage('Validate Parameters') {
+
+            steps {
+
+                script {
+
+                    if (!params.RELEASE_NAME?.trim()) {
+
+                        error 'RELEASE_NAME is required'
+                    }
+
+                    if (!params.RELEASE_NAME.startsWith('release-')) {
+
+                        error '''
+Only immutable release tags are allowed.
+
+Example:
+release-20260523-r1821
+'''
+                    }
+
+                    env.RELEASE_NAME =
+                        params.RELEASE_NAME
+
+                    env.SVN_TAG_URL =
+                        "${SVN_TAGS}/${RELEASE_NAME}"
+
+                    env.APP_VERSION =
+                        env.RELEASE_NAME
+
+                    currentBuild.displayName =
+                        "#${BUILD_NUMBER} ${APP_VERSION}"
+
+                    echo "RELEASE_NAME=${RELEASE_NAME}"
+                    echo "SVN_TAG_URL=${SVN_TAG_URL}"
+                }
+            }
+        }
+
+        stage('Checkout Immutable Release Tag') {
+
+            steps {
+
+                cleanWs()
+
+                checkout([
+                    $class: 'SubversionSCM',
+                    locations: [[
+                        credentialsId: 'svn-creds',
+                        remote: env.SVN_TAG_URL,
+                        local: '.'
+                    ]],
+                    workspaceUpdater: [$class: 'CheckoutUpdater']
+                ])
+            }
+        }
+
+        stage('Validate Lockfile') {
+
+            steps {
+
+                script {
+
+                    if (!fileExists('package-lock.json')) {
+
+                        error '''
+package-lock.json not found.
+
+Immutable frontend build requires
+deterministic dependency locking.
+'''
+                    }
+                }
+            }
+        }
+
+        stage('Configure npm Registry') {
+
+            steps {
+
+                withCredentials([string(
+                    credentialsId: 'npm-token',
+                    variable: 'NPM_TOKEN'
+                )]) {
+
+                    sh '''
+                        cat > ~/.npmrc <<EOF
+registry=http://nexus:8081/repository/npm-group/
+//nexus:8081/repository/npm-group/:_auth=${NPM_TOKEN}
+always-auth=true
+strict-ssl=false
+EOF
+                    '''
+
+                    sh '''
+                        echo "=============================="
+                        echo "NPMRC"
+                        echo "=============================="
+
+                        cat ~/.npmrc
+
+                        echo ""
+                        echo "=============================="
+                        echo "NPM REGISTRY"
+                        echo "=============================="
+
+                        npm config get registry
+
+                        echo ""
+                        echo "=============================="
+                        echo "NPM PING"
+                        echo "=============================="
+
+                        npm ping || true
+                    '''
+                }
+            }
+        }
+
+        stage('Install Dependencies') {
+
+            steps {
+
+                sh '''
+                    npm ci
+                '''
+            }
+        }
+
+        stage('Immutable Frontend Policy Validation') {
+
+            steps {
+
+                script {
+
+                    def violations = []
+
+                    def checks = [
+
+                        [
+                            name: '.env.production',
+                            cmd: '''
+                                find . \
+                                  -name ".env.production" \
+                                  | grep .
+                            '''
+                        ],
+
+                        [
+                            name: '.env.dev',
+                            cmd: '''
+                                find . \
+                                  -name ".env.dev" \
+                                  | grep .
+                            '''
+                        ],
+
+                        [
+                            name: '.env.stg',
+                            cmd: '''
+                                find . \
+                                  -name ".env.stg" \
+                                  | grep .
+                            '''
+                        ],
+
+                        [
+                            name: 'VITE_API_URL',
+                            cmd: '''
+                                grep -R "VITE_API_URL" src
+                            '''
+                        ],
+
+                        [
+                            name: 'Hardcoded Environment Endpoint',
+                            cmd: '''
+                                grep -R "dev-api\\|stg-api\\|prod-api" src
+                            '''
+                        ]
+                    ]
+
+                    checks.each { check ->
+
+                        def status = sh(
+                            returnStatus: true,
+                            script: """
+                                set +e
+                                ${check.cmd}
+                            """
+                        )
+
+                        if (status == 0) {
+
+                            violations.add(check.name)
+                        }
+                    }
+
+                    if (violations.size() > 0) {
+
+                        writeFile(
+                            file: 'immutable-policy-report.txt',
+                            text:
+                                '''
+IMMUTABLE POLICY VIOLATIONS
+
+''' +
+                                violations.join('\n')
+                        )
+
+                        error """
+IMMUTABLE FRONTEND POLICY VIOLATION
+
+${violations.join('\n')}
+"""
+                    }
+
+                    writeFile(
+                        file: 'immutable-policy-report.txt',
+                        text:
+                            '''
+IMMUTABLE FRONTEND POLICY VALIDATION PASSED
+'''
+                    )
+
+                    echo '''
+IMMUTABLE FRONTEND POLICY VALIDATION PASSED
+'''
+                }
+            }
+        }
+
+        stage('Lint') {
+
+            steps {
+
+                sh '''
+                    npm run lint
+                '''
+            }
+        }
+
+        stage('Unit Test') {
+
+            steps {
+
+                sh '''
+                    npm run test -- --run
+                '''
+            }
+        }
+
+        stage('Build Immutable Frontend Artifact') {
+
+            steps {
+
+                sh """
+                    VITE_APP_VERSION=${APP_VERSION} \
+                      npm run build
+                """
+            }
+        }
+
+        stage('Validate Build Artifact') {
+
+            steps {
+
+                sh '''
+                    test -d dist
+
+                    test -f dist/index.html
+
+                    echo "DIST CONTENTS"
+
+                    ls -al dist
+                '''
+            }
+        }
+
+        stage('Docker Build') {
+
+            steps {
+
+                script {
+
+                    env.FULL_TAG =
+                        "${IMAGE_NAME}:${APP_VERSION}"
+
+                    sh """
+                        docker build \
+                          --build-arg APP_VERSION=${APP_VERSION} \
+                          -t ${FULL_TAG} \
+                          -t ${IMAGE_NAME}:latest \
+                          .
+                    """
+                }
+            }
+        }
+
+        stage('Docker Push') {
+
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-creds',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+
+                    sh """
+                        echo "$NEXUS_PASS" \
+                          | docker login ${NEXUS_DOCKER} \
+                              -u "$NEXUS_USER" \
+                              --password-stdin
+
+                        docker push ${FULL_TAG}
+
+                        docker push ${IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
+
+        stage('Generate Build Metadata') {
+
+            steps {
+
+                sh """
+                    cat > build-info.json <<EOF
+{
+  "app": "${APP_NAME}",
+  "release_name": "${RELEASE_NAME}",
+  "app_version": "${APP_VERSION}",
+  "svn_tag_url": "${SVN_TAG_URL}",
+  "docker_image": "${FULL_TAG}",
+  "build_number": "${BUILD_NUMBER}",
+  "build_strategy": "immutable-react-build",
+  "artifact_strategy": "build-once-deploy-many"
+}
+EOF
+                """
+
+                sh """
+                    cat > artifact-manifest.json <<EOF
+{
+  "artifact_type": "immutable-nginx-frontend-image",
+  "dist_directory": "dist",
+  "docker_image": "${FULL_TAG}",
+  "release": "${RELEASE_NAME}"
+}
+EOF
+                """
+
+                archiveArtifacts(
+                    artifacts: '''
+                        build-info.json,
+                        artifact-manifest.json,
+                        immutable-policy-report.txt
+                    ''',
+                    fingerprint: true
+                )
+            }
+        }
+    }
+
+    post {
+
+        success {
+
+            echo """
+==================================================
+IMMUTABLE FRONTEND BUILD SUCCESS
+==================================================
+
+APP            : ${APP_NAME}
+VERSION        : ${APP_VERSION}
+IMAGE          : ${FULL_TAG}
+
+==================================================
+"""
+
+            build job: 'sample-react-deploy',
+                  parameters: [
+                      string(
+                          name: 'APP_VERSION',
+                          value: env.APP_VERSION
+                      ),
+                      string(
+                          name: 'TARGET_ENV',
+                          value: 'dev'
+                      )
+                  ],
+                  wait: false
+        }
+
+        failure {
+
+            echo """
+==================================================
+IMMUTABLE FRONTEND BUILD FAILED
+==================================================
+
+APP            : ${APP_NAME}
+VERSION        : ${APP_VERSION}
+
+==================================================
+"""
+        }
+
+        always {
+
+            sh '''
+                docker logout ${NEXUS_DOCKER} || true
+            '''
+
+            cleanWs()
+        }
+    }
+}

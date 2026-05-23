@@ -1,0 +1,342 @@
+pipeline {
+
+    agent {
+        docker {
+            image 'python-agent:1.0'
+            args '''
+                --network legacy-cicd-pipeline_cicd-net
+                -v /var/run/docker.sock:/var/run/docker.sock
+            '''
+        }
+    }
+
+    parameters {
+
+        string(
+            name: 'RELEASE_NAME',
+            defaultValue: '',
+            description: 'SVN immutable release tag'
+        )
+    }
+
+    environment {
+
+        APP_NAME = 'sample-fastapi'
+
+        SVN_BASE = "http://svn/svn/${APP_NAME}"
+
+        SVN_TAGS = "${SVN_BASE}/tags"
+
+        NEXUS_DOCKER = 'nexus.example.com:5000'
+
+        IMAGE_NAME = "${NEXUS_DOCKER}/${APP_NAME}"
+
+        PIP_INDEX_URL =
+            'http://nexus:8081/repository/pypi-group/simple'
+
+        PIP_TRUSTED_HOST = 'nexus'
+    }
+
+    options {
+
+        timestamps()
+
+        buildDiscarder(
+            logRotator(numToKeepStr: '30')
+        )
+
+        disableConcurrentBuilds()
+    }
+
+    stages {
+
+        stage('Validate Parameters') {
+
+            steps {
+
+                script {
+
+                    if (!params.RELEASE_NAME?.trim()) {
+
+                        error 'RELEASE_NAME is required'
+                    }
+
+                    env.RELEASE_NAME =
+                        params.RELEASE_NAME
+
+                    env.SVN_TAG_URL =
+                        "${SVN_TAGS}/${RELEASE_NAME}"
+
+                    env.APP_VERSION =
+                        env.RELEASE_NAME
+
+                    currentBuild.displayName =
+                        "#${env.BUILD_NUMBER} ${env.APP_VERSION}"
+
+                    echo """
+==================================================
+FASTAPI BUILD INFO
+==================================================
+
+RELEASE_NAME : ${RELEASE_NAME}
+SVN_TAG_URL  : ${SVN_TAG_URL}
+APP_VERSION  : ${APP_VERSION}
+
+==================================================
+"""
+                }
+            }
+        }
+
+        stage('Checkout Immutable Release Tag') {
+
+            steps {
+
+                cleanWs()
+
+                checkout([
+                    $class: 'SubversionSCM',
+                    locations: [[
+                        credentialsId: 'svn-creds',
+                        remote: env.SVN_TAG_URL,
+                        local: '.'
+                    ]],
+                    workspaceUpdater: [$class: 'CheckoutUpdater']
+                ])
+            }
+        }
+
+        stage('Verify Dependency Lock') {
+
+            steps {
+
+                sh '''
+                    test -f requirements.txt
+                '''
+
+                sh '''
+                    echo "=================================================="
+                    echo "REQUIREMENTS"
+                    echo "=================================================="
+
+                    cat requirements.txt
+                '''
+            }
+        }
+
+        stage('Setup Python Virtualenv') {
+
+            steps {
+
+                sh '''
+                    python3 -m venv .venv
+
+                    . .venv/bin/activate
+
+                    pip install --upgrade pip
+
+                    pip install \
+                        --index-url ${PIP_INDEX_URL} \
+                        --trusted-host ${PIP_TRUSTED_HOST} \
+                        -r requirements.txt
+                '''
+            }
+        }
+
+        stage('Run Unit Tests') {
+
+            steps {
+
+                sh '''
+                    . .venv/bin/activate
+
+                    PYTHONPATH=. pytest \
+                        --junitxml=test-results.xml
+                '''
+            }
+
+            post {
+
+                always {
+
+                    junit(
+                        allowEmptyResults: true,
+                        testResults: 'test-results.xml'
+                    )
+                }
+            }
+        }
+
+        stage('Dependency Security Audit') {
+
+            steps {
+
+                sh '''
+                    . .venv/bin/activate
+
+                    pip install pip-audit || true
+
+                    pip-audit || true
+                '''
+            }
+        }
+
+        stage('Generate Dependency Fingerprint') {
+
+            steps {
+
+                sh '''
+                    . .venv/bin/activate
+
+                    pip freeze \
+                        > pip-freeze.txt
+                '''
+
+                sh '''
+                    sha256sum requirements.txt \
+                        > requirements.sha256
+                '''
+            }
+        }
+
+        stage('Docker Build') {
+
+            steps {
+
+                script {
+
+                    env.FULL_TAG =
+                        "${IMAGE_NAME}:${APP_VERSION}"
+
+                    sh """
+                        docker build \
+                          --build-arg APP_VERSION=${APP_VERSION} \
+                          -t ${FULL_TAG} \
+                          -t ${IMAGE_NAME}:latest \
+                          .
+                    """
+                }
+            }
+        }
+
+        stage('Container Image Scan') {
+
+            steps {
+
+                sh """
+                    docker run --rm \
+                      -v /var/run/docker.sock:/var/run/docker.sock \
+                      aquasec/trivy image \
+                      --severity HIGH,CRITICAL \
+                      --no-progress \
+                      ${FULL_TAG} || true
+                """
+            }
+        }
+
+        stage('Docker Push') {
+
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-creds',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+
+                    sh """
+                        echo "$NEXUS_PASS" \
+                          | docker login ${NEXUS_DOCKER} \
+                              -u "$NEXUS_USER" \
+                              --password-stdin
+
+                        docker push ${FULL_TAG}
+
+                        docker push ${IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
+
+        stage('Generate Build Metadata') {
+
+            steps {
+
+                sh """
+cat > build-info.json <<EOF
+{
+  "app": "${APP_NAME}",
+  "release_name": "${RELEASE_NAME}",
+  "app_version": "${APP_VERSION}",
+  "image": "${FULL_TAG}",
+  "build_number": "${BUILD_NUMBER}"
+}
+EOF
+                """
+
+                archiveArtifacts(
+                    artifacts: '''
+                        build-info.json,
+                        pip-freeze.txt,
+                        requirements.sha256,
+                        requirements.txt
+                    ''',
+                    fingerprint: true
+                )
+            }
+        }
+    }
+
+    post {
+
+        success {
+
+            echo """
+==================================================
+FASTAPI BUILD SUCCESS
+==================================================
+
+APP           : ${APP_NAME}
+VERSION       : ${APP_VERSION}
+IMAGE         : ${FULL_TAG}
+
+==================================================
+"""
+            build job: 'sample-fastapi-deploy',
+                  parameters: [
+                      string(
+                          name: 'APP_VERSION',
+                          value: env.APP_VERSION
+                      ),
+                      string(
+                          name: 'TARGET_ENV',
+                          value: 'dev'
+                      )
+                  ],
+                  wait: false
+        }
+
+        failure {
+
+            echo """
+==================================================
+FASTAPI BUILD FAILED
+==================================================
+
+APP           : ${APP_NAME}
+VERSION       : ${APP_VERSION}
+
+==================================================
+"""
+        }
+
+        always {
+
+            sh '''
+                docker logout ${NEXUS_DOCKER} || true
+            '''
+
+            cleanWs()
+        }
+    }
+}
