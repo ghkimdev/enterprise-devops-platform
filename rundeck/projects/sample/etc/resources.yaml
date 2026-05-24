@@ -1,0 +1,77 @@
+# Rundeck Project 의 resources.yaml 예시
+# (Project → Edit Configuration → Resource Model Source 로 등록하거나
+#  파일을 framework 의 resources 경로에 두고 정적 source 로 사용)
+#
+# 노드 필터 'tags: ${option.env}+${option.app}' 가 동작하도록
+# 각 노드에 env, app 태그를 콤마로 나열한다.
+
+dev-react-01:
+  hostname: dev-web-01.example.com
+  username: deploy
+  ssh-key-storage-path: keys/project/sample/deploy-key
+  tags: dev,sample-react
+  osFamily: unix
+  description: React dev server
+
+stg-react-01:
+  hostname: stg-web-01.example.com
+  username: deploy
+  ssh-key-storage-path: keys/project/sample/deploy-key
+  tags: stg,sample-react
+  osFamily: unix
+
+prod-react-01:
+  hostname: prod-web-01.example.com
+  username: deploy
+  ssh-key-storage-path: keys/project/sample/deploy-key
+  tags: prod,sample-react
+  osFamily: unix
+
+prod-react-02:
+  hostname: prod-web-02.example.com
+  username: deploy
+  ssh-key-storage-path: keys/project/sample/deploy-key
+  tags: prod,sample-react
+  osFamily: unix
+
+dev-spring-01:
+  hostname: dev-api-01.example.com
+  username: deploy
+  ssh-key-storage-path: keys/project/sample/deploy-key
+  tags: dev,sample-spring
+  osFamily: unix
+
+stg-spring-01:
+  hostname: stg-api-01.example.com
+  username: deploy
+  ssh-key-storage-path: keys/project/sample/deploy-key
+  tags: stg,sample-spring
+  osFamily: unix
+
+prod-spring-01:
+  hostname: prod-api-01.example.com
+  username: deploy
+  ssh-key-storage-path: keys/project/sample/deploy-key
+  tags: prod,sample-spring
+  osFamily: unix
+
+dev-fastapi-01:
+  hostname: dev-ml-01.example.com
+  username: deploy
+  ssh-key-storage-path: keys/project/sample/deploy-key
+  tags: dev,sample-fastapi
+  osFamily: unix
+
+stg-fastapi-01:
+  hostname: stg-ml-01.example.com
+  username: deploy
+  ssh-key-storage-path: keys/project/sample/deploy-key
+  tags: stg,sample-fastapi
+  osFamily: unix
+
+prod-fastapi-01:
+  hostname: prod-ml-01.example.com
+  username: deploy
+  ssh-key-storage-path: keys/project/sample/deploy-key
+  tags: prod,sample-fastapi
+  osFamily: unix

@@ -71,6 +71,8 @@ services:
 
   nexus-init:
     image: alpine:3.23
+    container_name: nexus-init
+    restart: "no"
     env_file:
       - .env
     entrypoint: >
@@ -104,8 +106,10 @@ services:
       RUNDECK_JAAS_LDAP_BINDPASSWORD: ${LDAP_BIND_PASSWORD}
       RUNDECK_JAAS_LDAP_USERBASEDN: ${LDAP_USER_BASE},${LDAP_BASE_DN}
       RUNDECK_JAAS_LDAP_ROLEBASEDN: ${LDAP_ROLE_BASE},${LDAP_BASE_DN}
+      RUNDECK_JAAS_FILE_USEFIRSTPASS: 'true'
     volumes:
       - rundeck_data:/home/rundeck/server/data
+      - ./rundeck/projects:/home/rundeck/projects
     networks:
       - cicd-net
     healthcheck:

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project>
+
+  <node
+      name="dev-react-01"
+      hostname="dev-web-01.example.com"
+      username="deploy"
+      ssh-key-storage-path="keys/project/sample/deploy-key"
+      tags="dev,sample-react"
+      osFamily="unix"
+      description="React dev server"/>
+
+  <node
+      name="stg-react-01"
+      hostname="stg-web-01.example.com"
+      username="deploy"
+      ssh-key-storage-path="keys/project/sample/deploy-key"
+      tags="stg,sample-react"
+      osFamily="unix"/>
+
+  <node
+      name="prod-react-01"
+      hostname="prod-web-01.example.com"
+      username="deploy"
+      ssh-key-storage-path="keys/project/sample/deploy-key"
+      tags="prod,sample-react"
+      osFamily="unix"/>
+
+  <node
+      name="prod-react-02"
+      hostname="prod-web-02.example.com"
+      username="deploy"
+      ssh-key-storage-path="keys/project/sample/deploy-key"
+      tags="prod,sample-react"
+      osFamily="unix"/>
+
+  <node
+      name="dev-spring-01"
+      hostname="dev-api-01.example.com"
+      username="deploy"
+      ssh-key-storage-path="keys/project/sample/deploy-key"
+      tags="dev,sample-spring"
+      osFamily="unix"/>
+
+  <node
+      name="stg-spring-01"
+      hostname="stg-api-01.example.com"
+      username="deploy"
+      ssh-key-storage-path="keys/project/sample/deploy-key"
+      tags="stg,sample-spring"
+      osFamily="unix"/>
+
+  <node
+      name="prod-spring-01"
+      hostname="prod-api-01.example.com"
+      username="deploy"
+      ssh-key-storage-path="keys/project/sample/deploy-key"
+      tags="prod,sample-spring"
+      osFamily="unix"/>
+
+  <node
+      name="dev-fastapi-01"
+      hostname="dev-ml-01.example.com"
+      username="deploy"
+      ssh-key-storage-path="keys/project/sample/deploy-key"
+      tags="dev,sample-fastapi"
+      osFamily="unix"/>
+
+  <node
+      name="stg-fastapi-01"
+      hostname="stg-ml-01.example.com"
+      username="deploy"
+      ssh-key-storage-path="keys/project/sample/deploy-key"
+      tags="stg,sample-fastapi"
+      osFamily="unix"/>
+
+  <node
+      name="prod-fastapi-01"
+      hostname="prod-ml-01.example.com"
+      username="deploy"
+      ssh-key-storage-path="keys/project/sample/deploy-key"
+      tags="prod,sample-fastapi"
+      osFamily="unix"/>
+
+</project>

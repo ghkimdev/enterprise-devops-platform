@@ -1,0 +1,139 @@
+# Rundeck Job: 통합 배포 Job
+# 사용:
+#   rd jobs load --file rundeck-jobs/deploy-app.yaml --project cicd
+# Job UUID 는 첫 import 시 생성되므로, 그 UUID 를 Jenkinsfile.deploy-* 의
+# RUNDECK_DEPLOY_JOB_ID 에 넣어주면 된다.
+- name: deploy-app
+  description: |
+    Nexus 의 Docker 이미지를 받아 대상 환경 서버에 배포한다.
+    - app:     sample-react | sample-spring | sample-fastapi
+    - version: 이미지 태그 (예: 42-r1234)
+    - env:     dev | stg | prod
+  loglevel: INFO
+  executionEnabled: true
+  scheduleEnabled: false
+
+  options:
+    - name: app
+      required: true
+      enforced: true
+      values:
+        - sample-react
+        - sample-spring
+        - sample-fastapi
+      description: 배포할 앱 이름
+    - name: version
+      required: true
+      description: Docker 이미지 태그 (Jenkins 가 빌드 시 만든 값)
+    - name: env
+      required: true
+      enforced: true
+      values: [dev, stg, prod]
+      description: 대상 환경
+
+  # 노드 필터: env 옵션 + app 옵션 으로 대상 노드 결정
+  # Rundeck 의 노드 정의에 tags: dev,sample-react / stg,sample-spring 등을 미리 등록해두어야 한다.
+  nodefilters:
+    dispatch:
+      threadcount: 5
+      keepgoing: false   # 한 노드 실패 시 중단 (롤링 배포 원하면 true)
+      successOnEmptyNodeFilter: false
+    filter: 'tags: ${option.env}+${option.app}'
+
+  sequence:
+    keepgoing: false
+    strategy: node-first
+    commands:
+      # 1) Nexus Docker registry 로그인
+      - description: 'Login to Nexus Docker registry'
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          echo "$NEXUS_PASS" | docker login nexus.example.com:8082 -u "$NEXUS_USER" --password-stdin
+
+      # 2) 이미지 pull
+      - description: 'Pull image'
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+          IMAGE="nexus.example.com:8082/@option.app@:@option.version@"
+          echo "Pulling $IMAGE"
+          docker pull "$IMAGE"
+
+      # 3) 컨테이너 교체 (간단 버전: stop → rm → run)
+      #    프로덕션에서는 blue-green 또는 docker compose 가 더 안전.
+      - description: 'Replace container'
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+
+          APP="@option.app@"
+          VER="@option.version@"
+          ENV_NAME="@option.env@"
+          IMAGE="nexus.example.com:8082/${APP}:${VER}"
+
+          # 앱별 포트 매핑
+          case "$APP" in
+              sample-react)   HOST_PORT=80   ; CONT_PORT=80   ;;
+              sample-spring)  HOST_PORT=8080 ; CONT_PORT=8080 ;;
+              sample-fastapi) HOST_PORT=8000 ; CONT_PORT=8000 ;;
+              *) echo "Unknown app: $APP" ; exit 1 ;;
+          esac
+
+          # 기존 컨테이너 백업 태그 (롤백용)
+          if docker ps -a --format '{{.Names}}' | grep -q "^${APP}$"; then
+              CURRENT_IMG=$(docker inspect --format='{{.Config.Image}}' "${APP}")
+              echo "현재 이미지(롤백용): ${CURRENT_IMG}"
+              docker tag "${CURRENT_IMG}" "${APP}:previous" || true
+              docker stop "${APP}" || true
+              docker rm "${APP}" || true
+          fi
+
+          # 새 컨테이너 실행
+          docker run -d \
+              --name "${APP}" \
+              --restart unless-stopped \
+              -p ${HOST_PORT}:${CONT_PORT} \
+              -e APP_VERSION="${VER}" \
+              -e ENV_NAME="${ENV_NAME}" \
+              "${IMAGE}"
+
+          echo "배포 완료: ${APP} ${VER}"
+
+      # 4) 헬스 체크
+      - description: 'Health check'
+        script: |
+          #!/bin/bash
+          set -euo pipefail
+
+          APP="@option.app@"
+          case "$APP" in
+              sample-react)   URL="http://localhost/healthz"          ;;
+              sample-spring)  URL="http://localhost:8080/actuator/health" ;;
+              sample-fastapi) URL="http://localhost:8000/healthz"     ;;
+          esac
+
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+              if curl -fsS "$URL" > /dev/null; then
+                  echo "Health OK (attempt $i): $URL"
+                  exit 0
+              fi
+              echo "Waiting for health... ($i/10)"
+              sleep 3
+          done
+          echo "Health check 실패: $URL"
+          exit 1
+
+  notification:
+    onsuccess:
+      email:
+        recipients: devops@example.com
+        subject: '[Rundeck] ${job.name} ${option.app} ${option.version} → ${option.env} 성공'
+    onfailure:
+      email:
+        recipients: devops@example.com
+        subject: '[Rundeck] ${job.name} 실패 - ${option.app} → ${option.env}'
+
+  # NEXUS_USER / NEXUS_PASS 는 Rundeck Key Storage 에서 주입
+  # (Job 편집 → "Show advanced..." → script execution environment vars 로 설정,
+  #  또는 Project 의 framework property 로 노드별 주입 가능)
