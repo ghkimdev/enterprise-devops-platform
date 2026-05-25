@@ -18,3 +18,7 @@ role-strategy:848.va_a_ea_673cf0b_c
 parameterized-trigger:893.va_383a_9b_a_4c11
 job-dsl:3654.vdf58f53e2d15
 cloudbees-folder:6.1100.ve9eed61d16c4
+pipeline-utility-steps:3.810.va_7672d206740
+pipeline-groovy-lib:797.v90ea_a_9b_e45a_0
+copyartifact:795.ve8e151429b_27
+rundeck:3.6.14

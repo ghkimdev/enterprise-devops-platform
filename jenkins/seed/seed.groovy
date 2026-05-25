@@ -1,15 +1,19 @@
+// Jenkins Job DSL seed.
+//
+// 변경사항:
+//   - 각 앱마다 checkitem / build / deploy 3개 job만 생성
+
 println "Starting Seed Job..."
 
+// ───── Folder ─────
 folder('applications') {
     displayName('Applications')
     description('Application Pipelines')
 }
 
-def createPipelineJob(
-    name,
-    repo,
-    script
-) {
+
+// ───── Pipeline job 생성 헬퍼 ─────
+def createPipelineJob(String name, String repo, String script) {
     pipelineJob(name) {
         definition {
             cpsScm {
@@ -17,7 +21,6 @@ def createPipelineJob(
                 scm {
                     svn {
                         location(repo) {
-
                             credentials('svn-creds')
                         }
                     }
@@ -34,76 +37,35 @@ def createPipelineJob(
     }
 }
 
-createPipelineJob(
-    'applications/sample-spring-build',
-    'http://svn/svn/sample-spring/trunk',
-    'Jenkinsfile.build-spring'
-)
 
-createPipelineJob(
-    'applications/sample-spring-checkitem',
-    'http://svn/svn/sample-spring/trunk',
-    'Jenkinsfile.checkitem-spring'
-)
+// ───── 앱별 job 생성 ─────
+// 새 앱 추가 시 이 리스트에만 추가하면 됨.
+def apps = [
+    'sample-spring',
+    'sample-react',
+    'sample-fastapi'
+]
 
-createPipelineJob(
-    'applications/sample-spring-release',
-    'http://svn/svn/sample-spring/trunk',
-    'Jenkinsfile.release-spring'
-)
+apps.each { app ->
+    def repo = "http://svn/svn/${app}/trunk"
 
-createPipelineJob(
-    'applications/sample-spring-deploy',
-    'http://svn/svn/sample-spring/trunk',
-    'Jenkinsfile.deploy-spring'
-)
+    createPipelineJob(
+        "applications/${app}-checkitem",
+        repo,
+        "Jenkinsfile.checkitem-${app.replace('sample-', '')}"
+    )
 
-createPipelineJob(
-    'applications/sample-react-build',
-    'http://svn/svn/sample-react/trunk',
-    'Jenkinsfile.build-react'
-)
+    createPipelineJob(
+        "applications/${app}-build",
+        repo,
+        "Jenkinsfile.build-${app.replace('sample-', '')}"
+    )
 
-createPipelineJob(
-    'applications/sample-react-checkitem',
-    'http://svn/svn/sample-react/trunk',
-    'Jenkinsfile.checkitem-react'
-)
+    createPipelineJob(
+        "applications/${app}-deploy",
+        repo,
+        "Jenkinsfile.deploy-${app.replace('sample-', '')}"
+    )
+}
 
-createPipelineJob(
-    'applications/sample-react-release',
-    'http://svn/svn/sample-react/trunk',
-    'Jenkinsfile.release-react'
-)
-
-createPipelineJob(
-    'applications/sample-react-deploy',
-    'http://svn/svn/sample-react/trunk',
-    'Jenkinsfile.deploy-react'
-)
-
-createPipelineJob(
-    'applications/sample-fastapi-build',
-    'http://svn/svn/sample-fastapi/trunk',
-    'Jenkinsfile.build-fastapi'
-)
-
-createPipelineJob(
-    'applications/sample-fastapi-checkitem',
-    'http://svn/svn/sample-fastapi/trunk',
-    'Jenkinsfile.checkitem-fastapi'
-)
-
-createPipelineJob(
-    'applications/sample-fastapi-release',
-    'http://svn/svn/sample-fastapi/trunk',
-    'Jenkinsfile.release-fastapi'
-)
-
-createPipelineJob(
-    'applications/sample-fastapi-deploy',
-    'http://svn/svn/sample-fastapi/trunk',
-    'Jenkinsfile.deploy-fastapi'
-)
-
-println "Seed Job Complete"
+println "Seed Job Complete: ${apps.size()} apps × 3 jobs = ${apps.size() * 3} jobs"

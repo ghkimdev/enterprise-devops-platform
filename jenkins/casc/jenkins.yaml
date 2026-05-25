@@ -71,3 +71,15 @@ unclassified:
     smtpHost: "mailhog"
     smtpPort: "1025"
 
+  globalLibraries:
+    libraries:
+      - name: "sample-shared"
+        implicit: false
+        allowVersionOverride: true
+        includeInChangesets: true
+        retriever:
+          modernSCM:
+            scm:
+              subversion:
+                remoteBase: "http://svn/svn/jenkins-shared-library"
+                credentialsId: "svn-creds"
