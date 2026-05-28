@@ -79,7 +79,7 @@ services:
       sh -c "
         apk add --no-cache curl jq gettext &&
         chmod +x /scripts/*.sh &&
-        /scripts/provision.sh
+        /scripts/init-nexus.sh
       "
     volumes:
       - ./nexus/scripts:/scripts

@@ -201,7 +201,7 @@ else
         "/templates/docker-hosted.json"
 fi
 
-if repository_exists "docker-hub"; then
+if repository_exists "docker-proxy"; then
     echo "[SKIP] docker-hub already exists"
 else
     api_request \
@@ -224,15 +224,6 @@ fi
 
 echo "[INFO] Provisioning npm repository..."
 
-if repository_exists "npm-hosted"; then
-    echo "[SKIP] npm-hosted already exists"
-else
-    api_request \
-        POST \
-        "/service/rest/v1/repositories/npm/hosted" \
-        "/templates/npm-hosted.json"
-fi
-
 if repository_exists "npm-proxy"; then
     echo "[SKIP] npm-proxy already exists"
 else
@@ -252,17 +243,23 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# raw Repository Provisioning
+# -----------------------------------------------------------------------------
 
-echo "[INFO] Provisioning PyPI repository..."
+echo "[INFO] Provisioning raw repository..."
 
-if repository_exists "pypi-hosted"; then
-    echo "[SKIP] pypi-hosted already exists"
+if repository_exists "releases"; then
+    echo "[SKIP] releases already exists"
 else
     api_request \
         POST \
-        "/service/rest/v1/repositories/pypi/hosted" \
-        "/templates/pypi-hosted.json"
+        "/service/rest/v1/repositories/raw/hosted" \
+        "/templates/raw-hosted.json"
 fi
+
+# -----------------------------------------------------------------------------
+
+echo "[INFO] Provisioning PyPI repository..."
 
 if repository_exists "pypi-proxy"; then
     echo "[SKIP] pypi-proxy already exists"
@@ -292,6 +289,11 @@ api_request \
     PUT \
     "/service/rest/v1/security/realms/active" \
     "/templates/realm.json"
+
+api_request \
+    PUT \
+    "/service/rest/v1/security/anonymous" \
+    "/templates/anonymous.json"
 
 # -----------------------------------------------------------------------------
 # Nexus Role Provisioning
