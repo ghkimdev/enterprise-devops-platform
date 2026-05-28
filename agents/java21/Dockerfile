@@ -10,34 +10,28 @@ RUN apt-get update && \
         curl \
         unzip \
         ca-certificates \
-        python3 \
-        python3-pip \
-        python3-venv \
+        openjdk-21-jdk \
+        maven \
+        jq \
+        zip \
+        rsync \
     && rm -rf /var/lib/apt/lists/*
 
 #
-# Tooling virtualenv
-#
-RUN python3 -m venv /opt/pytools && \
-    /opt/pytools/bin/pip install --upgrade pip setuptools wheel && \
-    /opt/pytools/bin/pip install \
-        pytest \
-        pip-audit
-
-#
-# PATH
-#
-ENV PATH="/opt/pytools/bin:${PATH}"
-
-#
-# Workspace
+# Maven local repo
 #
 RUN mkdir -p \
       /workspace \
-      /home/jenkins/.pip \
+      /home/jenkins/.m2 \
     && chown -R jenkins:jenkins \
       /workspace \
-      /home/jenkins
+      /home/jenkins/.m2
+
+#
+# Verify
+#
+RUN java -version && \
+    mvn -version
 
 USER jenkins
 

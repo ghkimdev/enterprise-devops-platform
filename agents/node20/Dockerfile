@@ -10,7 +10,7 @@ RUN apt-get update && \
         curl \
         unzip \
         ca-certificates \
-        && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 #
 # Node.js 20 LTS
@@ -24,8 +24,20 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
 RUN npm install -g npm@10
 
 #
-# Verify toolchain
+# Workspace
+#
+RUN mkdir -p \
+      /workspace \
+      /home/jenkins/.npm \
+    && chown -R jenkins:jenkins \
+      /workspace \
+      /home/jenkins
+
+#
+# Verify
 #
 RUN node -v && npm -v
 
 USER jenkins
+
+WORKDIR /workspace
