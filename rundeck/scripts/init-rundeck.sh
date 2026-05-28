@@ -8,8 +8,10 @@ BASE_DIR=$(cd "${SCRIPT_DIR}/.." && pwd)
 PROJECT_NAME="sample"
 
 export RD_URL="${RD_URL:-https://rundeck.example.com}"
-export RD_TOKEN="${RD_TOKEN:-G38kJ6NAKfVfSilQEdoCdCB6QWYeLT2p}"
-export RD_INSECURE="${RD_INSECURE:-true}"
+export RD_USER="${RD_USER:-admin}"
+export RD_PASSWORD="${RD_PASSWORD:-admin}"
+
+export RD_TOKEN=$(rd tokens create -u admin -r * | tail -n 1)
 
 PROJECT_DIR="${BASE_DIR}/projects/${PROJECT_NAME}"
 JOB_DIR="${PROJECT_DIR}/jobs"
@@ -48,7 +50,7 @@ configure_project_resources() {
 
     rd projects configure update \
         -p "${PROJECT_NAME}" \
-        -f "${PROJECT_DIR}/project.properties"
+        -f "${PROJECT_DIR}/etc/project.properties"
 
     log "Project configuration applied"
 }

@@ -1,0 +1,22 @@
+[Unit]
+Description=sample-spring application
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/sample-spring/current
+EnvironmentFile=-/etc/sample-spring/env
+Environment=APP_VERSION=__RELEASE_NAME__
+Environment=ENV_NAME=__ENV_NAME__
+Environment=TEAM=__TEAM__
+ExecStart=/usr/bin/java -Dspring.profiles.active=${ENV_NAME} -jar /opt/sample-spring/current/app.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/opt/sample-spring/logs/app.log
+StandardError=append:/opt/sample-spring/logs/app.err
+
+[Install]
+WantedBy=multi-user.target
