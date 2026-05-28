@@ -1,9 +1,0 @@
-{
-  "name": "pypi-hosted",
-  "online": true,
-  "storage": {
-    "blobStoreName": "pypi-blob",
-    "strictContentTypeValidation": true,
-    "writePolicy": "ALLOW_ONCE"
-  }
-}
