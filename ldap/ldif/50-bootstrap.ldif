@@ -1,3 +1,23 @@
+# =====================================================================
+# 50-bootstrap.ldif
+#
+# 변경 요약:
+#   - 기존 admin/build/deploy/test 사용자는 유지
+#   - 추가: 팀별 9명 + SRE 1명 = 10명
+#       payment-team (Spring) : alice (lead), bob (dev), carol (qa)
+#       web-team     (React)  : david (lead), eve (dev), frank (qa)
+#       ml-team      (FastAPI): grace (lead), henry (dev), irene (qa)
+#       SRE                   : oscar
+#   - 그룹 추가: 팀 3개 + 환경별 oncall 3개
+#       dev-oncall  = bob, eve, henry
+#       stg-oncall  = carol, frank, irene
+#       prod-oncall = alice, david, grace, oscar
+#   - 메일링 리스트는 별도 LDAP entity로 만들지 않음. MailHog가 모든 메일을 receive하므로
+#     <user>@example.com, <team>@example.com, <env>-oncall@example.com 형식의 주소만
+#     실제로 어딘가에 도달하기만 하면 된다 (테스트 목적).
+#     운영 환경에선 메일링 리스트를 별도 시스템(Google Groups 등)으로 관리.
+# =====================================================================
+
 # Define top-level entry:
 #dn: {{ LDAP_BASE_DN }}
 #objectClass: dcObject
@@ -10,7 +30,10 @@ dn: ou=users,{{ LDAP_BASE_DN }}
 objectClass: organizationalUnit
 ou: users
 
-# Define some users:
+# ─────────────────────────────────────────────────────────────────────
+# 기존 사용자 (변경 없음)
+# ─────────────────────────────────────────────────────────────────────
+
 dn: cn=admin, ou=users,{{ LDAP_BASE_DN }}
 uid: admin
 mail: admin@example.com
@@ -57,12 +80,142 @@ objectClass: inetOrgPerson
 sn: Has no role access
 cn: test
 
-# Define an entry to contain roles:
+# ─────────────────────────────────────────────────────────────────────
+# 신규: payment-team (Spring 담당)
+# ─────────────────────────────────────────────────────────────────────
+
+dn: cn=alice, ou=users,{{ LDAP_BASE_DN }}
+uid: alice
+mail: alice@example.com
+userPassword: alice
+objectClass: person
+objectClass: top
+objectClass: inetOrgPerson
+sn: Payment team lead. Spring backend owner. prod-oncall.
+cn: alice
+givenName: Alice
+
+dn: cn=bob, ou=users,{{ LDAP_BASE_DN }}
+uid: bob
+mail: bob@example.com
+userPassword: bob
+objectClass: person
+objectClass: top
+objectClass: inetOrgPerson
+sn: Payment team developer. dev-oncall.
+cn: bob
+givenName: Bob
+
+dn: cn=carol, ou=users,{{ LDAP_BASE_DN }}
+uid: carol
+mail: carol@example.com
+userPassword: carol
+objectClass: person
+objectClass: top
+objectClass: inetOrgPerson
+sn: Payment team QA. stg-oncall.
+cn: carol
+givenName: Carol
+
+# ─────────────────────────────────────────────────────────────────────
+# 신규: web-team (React 담당)
+# ─────────────────────────────────────────────────────────────────────
+
+dn: cn=david, ou=users,{{ LDAP_BASE_DN }}
+uid: david
+mail: david@example.com
+userPassword: david
+objectClass: person
+objectClass: top
+objectClass: inetOrgPerson
+sn: Web team lead. React frontend owner. prod-oncall.
+cn: david
+givenName: David
+
+dn: cn=eve, ou=users,{{ LDAP_BASE_DN }}
+uid: eve
+mail: eve@example.com
+userPassword: eve
+objectClass: person
+objectClass: top
+objectClass: inetOrgPerson
+sn: Web team developer. dev-oncall.
+cn: eve
+givenName: Eve
+
+dn: cn=frank, ou=users,{{ LDAP_BASE_DN }}
+uid: frank
+mail: frank@example.com
+userPassword: frank
+objectClass: person
+objectClass: top
+objectClass: inetOrgPerson
+sn: Web team QA. stg-oncall.
+cn: frank
+givenName: Frank
+
+# ─────────────────────────────────────────────────────────────────────
+# 신규: ml-team (FastAPI 담당)
+# ─────────────────────────────────────────────────────────────────────
+
+dn: cn=grace, ou=users,{{ LDAP_BASE_DN }}
+uid: grace
+mail: grace@example.com
+userPassword: grace
+objectClass: person
+objectClass: top
+objectClass: inetOrgPerson
+sn: ML team lead. FastAPI service owner. prod-oncall.
+cn: grace
+givenName: Grace
+
+dn: cn=henry, ou=users,{{ LDAP_BASE_DN }}
+uid: henry
+mail: henry@example.com
+userPassword: henry
+objectClass: person
+objectClass: top
+objectClass: inetOrgPerson
+sn: ML team developer. dev-oncall.
+cn: henry
+givenName: Henry
+
+dn: cn=irene, ou=users,{{ LDAP_BASE_DN }}
+uid: irene
+mail: irene@example.com
+userPassword: irene
+objectClass: person
+objectClass: top
+objectClass: inetOrgPerson
+sn: ML team QA. stg-oncall.
+cn: irene
+givenName: Irene
+
+# ─────────────────────────────────────────────────────────────────────
+# 신규: SRE (모든 prod 알림 받음)
+# ─────────────────────────────────────────────────────────────────────
+
+dn: cn=oscar, ou=users,{{ LDAP_BASE_DN }}
+uid: oscar
+mail: oscar@example.com
+userPassword: oscar
+objectClass: person
+objectClass: top
+objectClass: inetOrgPerson
+sn: SRE. prod-oncall for all apps.
+cn: oscar
+givenName: Oscar
+
+# ─────────────────────────────────────────────────────────────────────
+# Roles
+# ─────────────────────────────────────────────────────────────────────
+
 dn: ou=roles, {{ LDAP_BASE_DN }}
 objectClass: organizationalUnit
 ou: roles
 
-# Define some roles and their membership:
+# 기존 Jenkins role 정의 (변경 없음)
+
 dn: cn=architect, ou=roles,{{ LDAP_BASE_DN }}
 objectClass: groupOfUniqueNames
 uniqueMember: cn=admin,ou=users,{{ LDAP_BASE_DN }}
@@ -78,12 +231,25 @@ objectClass: groupOfUniqueNames
 uniqueMember: cn=admin,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=deploy,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=build,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=alice,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=bob,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=carol,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=david,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=eve,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=frank,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=grace,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=henry,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=irene,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=oscar,ou=users,{{ LDAP_BASE_DN }}
 cn: user
 
 dn: cn=developer, ou=roles,{{ LDAP_BASE_DN }}
 objectClass: groupOfUniqueNames
 uniqueMember: cn=build,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=deploy,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=bob,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=eve,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=henry,ou=users,{{ LDAP_BASE_DN }}
 cn: developer
 
 dn: cn=build, ou=roles,{{ LDAP_BASE_DN }}
@@ -97,3 +263,60 @@ objectClass: groupOfUniqueNames
 uniqueMember: cn=admin,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=deploy,ou=users,{{ LDAP_BASE_DN }}
 cn: deploy
+
+# ─────────────────────────────────────────────────────────────────────
+# 신규: 팀 그룹
+# ─────────────────────────────────────────────────────────────────────
+
+dn: cn=payment-team, ou=roles,{{ LDAP_BASE_DN }}
+objectClass: groupOfUniqueNames
+uniqueMember: cn=alice,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=bob,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=carol,ou=users,{{ LDAP_BASE_DN }}
+cn: payment-team
+description: Owns sample-spring. Mailing list payment-team@example.com.
+
+dn: cn=web-team, ou=roles,{{ LDAP_BASE_DN }}
+objectClass: groupOfUniqueNames
+uniqueMember: cn=david,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=eve,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=frank,ou=users,{{ LDAP_BASE_DN }}
+cn: web-team
+description: Owns sample-react. Mailing list web-team@example.com.
+
+dn: cn=ml-team, ou=roles,{{ LDAP_BASE_DN }}
+objectClass: groupOfUniqueNames
+uniqueMember: cn=grace,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=henry,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=irene,ou=users,{{ LDAP_BASE_DN }}
+cn: ml-team
+description: Owns sample-fastapi. Mailing list ml-team@example.com.
+
+# ─────────────────────────────────────────────────────────────────────
+# 신규: 환경별 oncall (cross-team)
+# ─────────────────────────────────────────────────────────────────────
+
+dn: cn=dev-oncall, ou=roles,{{ LDAP_BASE_DN }}
+objectClass: groupOfUniqueNames
+uniqueMember: cn=bob,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=eve,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=henry,ou=users,{{ LDAP_BASE_DN }}
+cn: dev-oncall
+description: dev environment on-call. Mailing list dev-oncall@example.com.
+
+dn: cn=stg-oncall, ou=roles,{{ LDAP_BASE_DN }}
+objectClass: groupOfUniqueNames
+uniqueMember: cn=carol,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=frank,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=irene,ou=users,{{ LDAP_BASE_DN }}
+cn: stg-oncall
+description: stg environment on-call. Mailing list stg-oncall@example.com.
+
+dn: cn=prod-oncall, ou=roles,{{ LDAP_BASE_DN }}
+objectClass: groupOfUniqueNames
+uniqueMember: cn=alice,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=david,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=grace,ou=users,{{ LDAP_BASE_DN }}
+uniqueMember: cn=oscar,ou=users,{{ LDAP_BASE_DN }}
+cn: prod-oncall
+description: prod environment on-call. Mailing list prod-oncall@example.com.
