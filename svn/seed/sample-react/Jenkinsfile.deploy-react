@@ -1,3 +1,126 @@
-@Library('sample-shared@trunk') _
+// Jenkinsfile.deploy-react
 
-deployPipeline(app: 'sample-react')
+pipeline {
+    agent {
+        docker {
+            image 'njenkins-agent-node20:1.0.0'
+            args '''
+                --network legacy-cicd-pipeline_cicd-net
+            '''
+        }
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    parameters {
+        string(
+            name: 'APP_VERSION',
+            defaultValue: '',
+            description: 'tar.gz 파일명 (예: r-sample-react-20260525_143012.tar.gz). Nexus releases에 존재해야 함.'
+        )
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['dev', 'stg', 'prod'],
+            description: '배포 대상 환경'
+        )
+    }
+
+    environment {
+        APP_NAME            = 'sample-react'
+        TEAM                = 'web-team'
+
+        NEXUS_BASE          = 'http://nexus:8081'
+        NEXUS_CREDS         = 'nexus-creds'
+        NEXUS_RAW_REPO      = 'releases'
+
+        RUNDECK_INSTANCE    = 'default'
+        RUNDECK_DEPLOY_JOB  = 'sample:deploy-app'
+    }
+
+    stages {
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    if (!params.APP_VERSION?.trim()) {
+                        error 'APP_VERSION is required (예: r-sample-react-20260525_143012.tar.gz)'
+                    }
+                    if (!params.APP_VERSION.endsWith('.tar.gz')) {
+                        error 'APP_VERSION must end with .tar.gz'
+                    }
+                    // tar.gz를 떼서 release_name 추출
+                    env.RELEASE_NAME = params.APP_VERSION.replaceAll(/\.tar\.gz$/, '')
+                    currentBuild.displayName =
+                        "#${env.BUILD_NUMBER} ${params.TARGET_ENV} ← ${env.RELEASE_NAME}"
+                    echo """
+APP             : ${env.APP_NAME}
+RELEASE         : ${env.RELEASE_NAME}
+TARGET ENV      : ${params.TARGET_ENV}
+"""
+                }
+            }
+        }
+
+        stage('Approval (prod only)') {
+            when {
+                expression { params.TARGET_ENV == 'prod' }
+            }
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    input(
+                        message: "Deploy ${env.RELEASE_NAME} to PROD?",
+                        ok: 'Deploy'
+                    )
+                }
+            }
+        }
+
+        stage('Verify Artifact Exists') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: env.NEXUS_CREDS,
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+                    sh """
+                        URL="${env.NEXUS_BASE}/repository/${env.NEXUS_RAW_REPO}/${env.APP_NAME}/${params.APP_VERSION}"
+                        if ! curl -fsS -I --user "\$NEXUS_USER:\$NEXUS_PASS" "\$URL" > /dev/null; then
+                            echo "Artifact not found: \$URL"
+                            exit 1
+                        fi
+                    """
+                }
+            }
+        }
+
+        stage('Deploy via Rundeck') {
+            steps {
+                step([
+                    $class                  : 'RundeckNotifier',
+                    rundeckInstance         : env.RUNDECK_INSTANCE,
+                    jobId                   : env.RUNDECK_DEPLOY_JOB,
+                    options                 : """
+app=${env.APP_NAME}
+version=${params.APP_VERSION}
+release_name=${env.RELEASE_NAME}
+env=${params.TARGET_ENV}
+team=${env.TEAM}
+""".trim(),
+                    shouldWaitForRundeckJob : true,
+                    shouldFailTheBuild      : true,
+                    includeRundeckLogs      : true,
+                    tailLog                 : true
+                ])
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

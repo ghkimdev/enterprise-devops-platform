@@ -1,0 +1,120 @@
+// Jenkinsfile.rollback-spring
+//
+// 노드의 /opt/sample-spring/releases/에 보관된 이전 release로 복귀.
+// 실제 작업은 Rundeck rollback-app 잡이 노드에서 수행.
+
+pipeline {
+    agent {
+        docker {
+            image 'jenkins-agent-java21:1.0.0'
+            args '''
+                --network legacy-cicd-pipeline_cicd-net
+                -v /var/run/docker.sock:/var/run/docker.sock
+            '''
+        }
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    parameters {
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['dev', 'stg', 'prod'],
+            description: '롤백할 환경'
+        )
+        string(
+            name: 'TARGET_RELEASE',
+            defaultValue: '',
+            description: '복귀할 release name (예: r-sample-spring-20260525_143012). 비우면 직전 release로.'
+        )
+    }
+
+    environment {
+        APP_NAME            = 'sample-spring'
+        TEAM                = 'payment-team'
+        RUNDECK_INSTANCE    = 'default'
+        RUNDECK_PROJECT     = 'sample'
+        RUNDECK_ROLLBACK_JOB = 'sample:rollback-app'
+    }
+
+    stages {
+        stage('Show Plan') {
+            steps {
+                script {
+                    currentBuild.displayName =
+                        "#${env.BUILD_NUMBER} ROLLBACK ${params.TARGET_ENV}" +
+                        (params.TARGET_RELEASE ? " → ${params.TARGET_RELEASE}" : ' (previous)')
+
+                    echo """
+==================================================
+ROLLBACK PLAN
+==================================================
+APP             : ${env.APP_NAME}
+TARGET ENV      : ${params.TARGET_ENV}
+TARGET RELEASE  : ${params.TARGET_RELEASE ?: '(previous)'}
+==================================================
+"""
+                }
+            }
+        }
+
+        stage('Approval (prod only)') {
+            when {
+                expression { params.TARGET_ENV == 'prod' }
+            }
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    input(
+                        message: """
+ROLLBACK PRODUCTION?
+
+  APP             : ${env.APP_NAME}
+  TARGET RELEASE  : ${params.TARGET_RELEASE ?: '(previous)'}
+""",
+                        ok: 'Rollback'
+                    )
+                }
+            }
+        }
+
+        stage('Rollback via Rundeck') {
+            steps {
+                step([
+                    $class                  : 'RundeckNotifier',
+                    rundeckInstance         : env.RUNDECK_INSTANCE,
+                    jobId                   : env.RUNDECK_ROLLBACK_JOB,
+                    options                 : """
+app=${env.APP_NAME}
+env=${params.TARGET_ENV}
+target_release=${params.TARGET_RELEASE}
+team=${env.TEAM}
+""".trim(),
+                    shouldWaitForRundeckJob : true,
+                    shouldFailTheBuild      : true,
+                    includeRundeckLogs      : true,
+                    tailLog                 : true
+                ])
+            }
+        }
+    }
+
+    post {
+        success {
+            echo """
+==================================================
+ROLLBACK SUCCESS
+==================================================
+APP             : ${env.APP_NAME}
+ENV             : ${params.TARGET_ENV}
+==================================================
+"""
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

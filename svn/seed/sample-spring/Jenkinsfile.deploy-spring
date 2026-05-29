@@ -1,3 +1,179 @@
-@Library('sample-shared@trunk') _
+// Jenkinsfile.deploy-spring
+//
+// 사용자가 지정한 maven_version의 sample-spring을 대상 환경에 배포한다.
+// 실제 배포는 Rundeck deploy-app 잡이 ssh로 노드에 들어가서 수행.
+//
+// 흐름:
+//   1. APP_VERSION (maven version, e.g. 20260525_143012) 입력
+//   2. TARGET_ENV (dev/stg/prod) 선택
+//   3. prod이면 input approval
+//   4. Nexus maven-releases에 해당 artifact 존재하는지 HEAD로 확인
+//   5. Rundeck deploy-app 잡 호출 (jobIdentifier 방식)
+//   6. Rundeck이 끝날 때까지 대기, 실패면 Jenkins도 실패
 
-deployPipeline(app: 'sample-spring')
+pipeline {
+    agent {
+        docker {
+            image 'jenkins-agent-java21:1.0.0'
+            args '''
+                --network legacy-cicd-pipeline_cicd-net
+                -v /var/run/docker.sock:/var/run/docker.sock
+            '''
+        }
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '50'))
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    parameters {
+        string(
+            name: 'APP_VERSION',
+            defaultValue: '',
+            description: 'Maven version - YYYYMMDD_HHMMSS 형식. Nexus maven-releases에 존재해야 함.'
+        )
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['dev', 'stg', 'prod'],
+            description: '배포 대상 환경'
+        )
+    }
+
+    environment {
+        APP_NAME           = 'sample-spring'
+        TEAM               = 'payment-team'
+
+        NEXUS_BASE         = 'http://nexus:8081'
+        NEXUS_CREDS        = 'nexus-creds'
+        MAVEN_RELEASES_REPO = 'maven-releases'
+        MAVEN_GROUP_ID     = 'com.example'
+        MAVEN_ARTIFACT_ID  = 'sample-spring'
+
+        RUNDECK_INSTANCE   = 'default'
+        RUNDECK_PROJECT    = 'sample'
+        RUNDECK_DEPLOY_JOB = 'sample:deploy-app'    // project:jobname
+    }
+
+    stages {
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    if (!params.APP_VERSION?.trim()) {
+                        error 'APP_VERSION is required.'
+                    }
+                    env.RELEASE_NAME = "r-${env.APP_NAME}-${params.APP_VERSION}"
+                    currentBuild.displayName =
+                        "#${env.BUILD_NUMBER} ${params.TARGET_ENV} ← ${env.RELEASE_NAME}"
+                    echo """
+==================================================
+DEPLOY REQUEST
+==================================================
+APP             : ${env.APP_NAME}
+TEAM            : ${env.TEAM}
+RELEASE         : ${env.RELEASE_NAME}
+MAVEN_VERSION   : ${params.APP_VERSION}
+TARGET ENV      : ${params.TARGET_ENV}
+==================================================
+"""
+                }
+            }
+        }
+
+        stage('Approval (prod only)') {
+            when {
+                expression { params.TARGET_ENV == 'prod' }
+            }
+            steps {
+                timeout(time: 30, unit: 'MINUTES') {
+                    input(
+                        message: """
+Deploy to PRODUCTION?
+
+  APP        : ${env.APP_NAME}
+  RELEASE    : ${env.RELEASE_NAME}
+""",
+                        ok: 'Deploy'
+                    )
+                }
+            }
+        }
+
+        stage('Verify Artifact Exists') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: env.NEXUS_CREDS,
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+                    sh """
+                        URL="${env.NEXUS_BASE}/repository/${env.MAVEN_RELEASES_REPO}/${env.MAVEN_GROUP_ID.replace('.', '/')}/${env.MAVEN_ARTIFACT_ID}/${params.APP_VERSION}/${env.MAVEN_ARTIFACT_ID}-${params.APP_VERSION}.jar"
+                        echo "Checking: \$URL"
+
+                        if ! curl -fsS -I --user "\$NEXUS_USER:\$NEXUS_PASS" "\$URL" > /dev/null; then
+                            echo "Artifact not found in Nexus."
+                            echo "Build 잡이 정상 종료됐는지 확인하세요."
+                            exit 1
+                        fi
+                    """
+                }
+            }
+        }
+
+        stage('Deploy via Rundeck') {
+            steps {
+                step([
+                    $class                  : 'RundeckNotifier',
+                    rundeckInstance         : env.RUNDECK_INSTANCE,
+                    jobId                   : env.RUNDECK_DEPLOY_JOB,
+                    options                 : """
+app=${env.APP_NAME}
+version=${params.APP_VERSION}
+release_name=${env.RELEASE_NAME}
+env=${params.TARGET_ENV}
+team=${env.TEAM}
+""".trim(),
+                    shouldWaitForRundeckJob : true,
+                    shouldFailTheBuild      : true,
+                    includeRundeckLogs      : true,
+                    tailLog                 : true
+                ])
+            }
+        }
+
+        stage('Archive Deploy Metadata') {
+            steps {
+                script {
+                    writeJSON file: 'deploy-info.json', json: [
+                        app: env.APP_NAME,
+                        team: env.TEAM,
+                        release_name: env.RELEASE_NAME,
+                        app_version: params.APP_VERSION,
+                        target_env: params.TARGET_ENV,
+                        build_number: env.BUILD_NUMBER,
+                        build_url: env.BUILD_URL
+                    ], pretty: 2
+                }
+                archiveArtifacts artifacts: 'deploy-info.json', fingerprint: true
+            }
+        }
+    }
+
+    post {
+        success {
+            echo """
+==================================================
+DEPLOY SUCCESS
+==================================================
+APP         : ${env.APP_NAME}
+RELEASE     : ${env.RELEASE_NAME}
+ENV         : ${params.TARGET_ENV}
+==================================================
+"""
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

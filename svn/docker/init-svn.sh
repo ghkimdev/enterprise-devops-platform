@@ -13,6 +13,11 @@ do
           file://${REPO_PATH}/branches \
           file://${REPO_PATH}/tags \
           -m "Initialize layout"
+        echo "Adding initial tag..."
+        svn mkdir \
+          file://${REPO_PATH}/tags/r-initial \
+          -m "Add Initial tag"
+        echo "Adding initial seed..."
         svn import /seed/${repo} \
             file://${REPO_PATH}/trunk \
             -m "Initial repository structure"
@@ -24,7 +29,7 @@ do
         done
         echo "SVN bootstrap complete."
     else
-        echo "Repository already exists."
+        echo "${repo} Repository already exists."
     fi
 done
  

@@ -1,3 +1,188 @@
-@Library('sample-shared@trunk') _
+// Jenkinsfile.checkitem-react
 
-checkitemPipeline(app: 'sample-react')
+pipeline {
+    agent {
+        docker {
+            image 'jenkins-agent-node20:1.0.0'
+            args '''
+                --network legacy-cicd-pipeline_cicd-net
+            '''
+        }
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    parameters {
+        string(
+            name: 'BASE_TAG',
+            defaultValue: 'r-initial',
+            description: '비교 기준 release tag (예: r-initial, r-sample-react-20260525_143012)'
+        )
+    }
+
+    environment {
+        APP_NAME    = 'sample-react'
+        SVN_BASE    = 'http://svn/svn/sample-react'
+        SVN_TRUNK   = 'http://svn/svn/sample-react/trunk'
+        SVN_TAGS    = 'http://svn/svn/sample-react/tags'
+        SVN_CREDS   = 'svn-creds'
+    }
+
+    stages {
+        stage('Validate') {
+            steps {
+                script {
+                    if (!params.BASE_TAG?.trim()) {
+                        error 'BASE_TAG is required.'
+                    }
+                }
+            }
+        }
+
+        stage('Checkout Trunk') {
+            steps {
+                cleanWs()
+
+                withCredentials([usernamePassword(
+                    credentialsId: env.SVN_CREDS,
+                    usernameVariable: 'SVN_USER',
+                    passwordVariable: 'SVN_PASS'
+                )]) {
+                    sh """
+                        svn checkout \
+                            --username "\$SVN_USER" \
+                            --password "\$SVN_PASS" \
+                            --no-auth-cache \
+                            --non-interactive \
+                            ${env.SVN_TRUNK} .
+                    """
+                }
+            }
+        }
+
+        stage('Collect Revisions') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: env.SVN_CREDS,
+                    usernameVariable: 'SVN_USER',
+                    passwordVariable: 'SVN_PASS'
+                )]) {
+                    sh """
+                        svn info --username "\$SVN_USER" --password "\$SVN_PASS" --no-auth-cache \
+                            --show-item revision ${env.SVN_TRUNK} > .new_rev.txt
+                        svn info --username "\$SVN_USER" --password "\$SVN_PASS" --no-auth-cache \
+                            --show-item revision ${env.SVN_TAGS}/${params.BASE_TAG} > .old_rev.txt
+                    """
+                }
+                script {
+                    env.NEW_REVISION = readFile('.new_rev.txt').trim()
+                    env.OLD_REVISION = readFile('.old_rev.txt').trim()
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} r${env.NEW_REVISION}"
+                }
+            }
+        }
+
+        stage('Generate Diff and Log') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: env.SVN_CREDS,
+                    usernameVariable: 'SVN_USER',
+                    passwordVariable: 'SVN_PASS'
+                )]) {
+                    sh """
+                        svn diff --summarize \
+                            --username "\$SVN_USER" --password "\$SVN_PASS" --no-auth-cache \
+                            -r ${env.OLD_REVISION}:${env.NEW_REVISION} \
+                            ${env.SVN_TRUNK} > changed-files.txt || true
+
+                        svn log \
+                            --username "\$SVN_USER" --password "\$SVN_PASS" --no-auth-cache \
+                            -r ${env.OLD_REVISION}:${env.NEW_REVISION} \
+                            ${env.SVN_TRUNK} > commit-log.txt || true
+                    """
+                }
+            }
+        }
+
+        stage('Write checkitem.json') {
+            steps {
+                script {
+                    writeJSON file: 'checkitem.json', json: [
+                        app: env.APP_NAME,
+                        latest_tag: params.BASE_TAG,
+                        old_revision: env.OLD_REVISION,
+                        new_revision: env.NEW_REVISION,
+                        svn_revision: env.NEW_REVISION,
+                        checkitem_build_number: env.BUILD_NUMBER,
+                        checkitem_build_url: env.BUILD_URL
+                    ], pretty: 2
+                }
+            }
+        }
+
+        stage('Write release-note.md') {
+            steps {
+                sh """
+                    cat > release-note.md <<EOF
+# Release Check Item
+
+## Application
+${env.APP_NAME}
+
+## Base Tag
+${params.BASE_TAG}
+
+## Revision Range
+- Old: r${env.OLD_REVISION}
+- New: r${env.NEW_REVISION}
+
+## Changed Files
+
+EOF
+
+                    cat changed-files.txt >> release-note.md
+
+                    cat >> release-note.md <<EOF
+
+## Commit Log
+
+EOF
+
+                    cat commit-log.txt >> release-note.md
+                """
+            }
+        }
+
+        stage('Archive') {
+            steps {
+                archiveArtifacts(
+                    artifacts: 'checkitem.json,changed-files.txt,commit-log.txt,release-note.md',
+                    fingerprint: true,
+                    allowEmptyArchive: true
+                )
+            }
+        }
+    }
+
+    post {
+        success {
+            echo """
+==================================================
+CHECKITEM SUCCESS — ${env.APP_NAME}
+==================================================
+NEW_REVISION    : ${env.NEW_REVISION}
+CHECKITEM #     : ${env.BUILD_NUMBER}
+
+다음 단계: sample-react-build 잡 with CHECKITEM_BUILD_NUMBER=${env.BUILD_NUMBER}
+==================================================
+"""
+        }
+        always {
+            cleanWs()
+        }
+    }
+}
