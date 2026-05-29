@@ -4,7 +4,8 @@
   "storage": {
     "blobStoreName": "docker-blob",
     "strictContentTypeValidation": true,
-    "writePolicy": "ALLOW_ONCE"
+    "writePolicy": "ALLOW_ONCE",
+    "latestPolicy": true
   },
   "docker": {
     "v1Enabled": false,
