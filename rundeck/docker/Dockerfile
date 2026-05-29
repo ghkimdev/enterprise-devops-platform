@@ -5,7 +5,7 @@ USER root
 # 1. CA 복사
 COPY certs/ca.crt /usr/local/share/ca-certificates/self-ca.crt
 
-# 2. OS trust store 업데이트 (선택이지만 권장)
+# 2. OS trust store 업데이트
 RUN apt-get update && apt-get install -y ca-certificates \
     && update-ca-certificates
 

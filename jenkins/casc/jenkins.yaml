@@ -71,6 +71,14 @@ unclassified:
     smtpHost: "mailhog"
     smtpPort: "1025"
 
+  rundeckNotifier:
+    rundeckInstances:
+      - name: "default"
+        url: "http://rundeck:4440"
+        login: "admin"
+        password: "admin"
+        apiVersion: "34"
+
   globalLibraries:
     libraries:
       - name: "sample-shared"
@@ -81,5 +89,5 @@ unclassified:
           modernSCM:
             scm:
               subversion:
-                remoteBase: "http://svn/svn/jenkins-shared-library"
+                remoteBase: "http://svn/svn/jenkins-shared-library/trunk"
                 credentialsId: "svn-creds"

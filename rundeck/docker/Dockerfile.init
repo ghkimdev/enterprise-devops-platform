@@ -1,0 +1,21 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update && \
+    apt-get install -y \
+      curl \
+      unzip \
+      jq \
+      ca-certificates \
+      openjdk-17-jre-headless && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -L \
+    https://github.com/rundeck/rundeck-cli/releases/download/v2.1.1/rd-2.1.1.zip \
+    -o /tmp/rd.zip && \
+    mkdir -p /opt/rundeck-cli && \
+    unzip /tmp/rd.zip -d /opt/rundeck-cli && \
+    ln -s \
+      /opt/rundeck-cli/rd-2.1.1/bin/rd \
+      /usr/local/bin/rd
+
+ENTRYPOINT ["/bin/bash"]

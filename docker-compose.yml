@@ -122,6 +122,29 @@ services:
       ldap:
         condition: service_healthy
 
+  rundeck-init:
+    build:
+      context: ./rundeck
+      dockerfile: docker/Dockerfile.init
+    container_name: rundeck-init
+    restart: "no"
+    depends_on:
+      rundeck:
+        condition: service_healthy
+    environment:
+      RD_URL: http://rundeck:4440
+      RD_USER: admin
+      RD_PASSWORD: admin
+      RD_INSECURE: "true"
+    volumes:
+      - ./rundeck/projects:/home/rundeck/projects
+      - ./rundeck/keys:/home/rundeck/keys
+      - ./rundeck/scripts:/scripts
+    networks:
+      - cicd-net
+    command:
+      - /scripts/init-rundeck.sh
+
   svn:
     build: 
       context: ./svn

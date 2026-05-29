@@ -2,124 +2,156 @@
 
 set -euo pipefail
 
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-BASE_DIR=$(cd "${SCRIPT_DIR}/.." && pwd)
-
-PROJECT_NAME="sample"
-
-export RD_URL="${RD_URL:-https://rundeck.example.com}"
+export RD_URL="${RD_URL:-http://rundeck:4440}"
 export RD_USER="${RD_USER:-admin}"
 export RD_PASSWORD="${RD_PASSWORD:-admin}"
+export RD_INSECURE="${RD_INSECURE:-true}"
 
-export RD_TOKEN=$(rd tokens create -u admin -r * | tail -n 1)
-
-PROJECT_DIR="${BASE_DIR}/projects/${PROJECT_NAME}"
+PROJECT_NAME="sample"
+PROJECT_DIR="/home/rundeck/projects/${PROJECT_NAME}"
 JOB_DIR="${PROJECT_DIR}/jobs"
 
-KEY_PATH="${BASE_DIR}/keys/project/${PROJECT_NAME}/deploy-key"
+KEY_PATH="/home/rundeck/keys/project/${PROJECT_NAME}/deploy-key"
 KEY_STORAGE_PATH="keys/project/${PROJECT_NAME}/deploy-key"
 
 log() {
-    echo "[rundeck-bootstrap] $1"
+echo "[rundeck-bootstrap] $1"
+}
+
+wait_for_rundeck() {
+log "Waiting for Rundeck API..."
+
+until rd system info >/dev/null 2>&1
+do
+    sleep 5
+done
+
+log "Rundeck API reachable"
+
+}
+
+create_token() {
+if [[ -n "${RD_TOKEN:-}" ]]; then
+log "Using existing RD_TOKEN"
+return
+fi
+
+log "Creating bootstrap token..."
+
+export RD_TOKEN
+RD_TOKEN=$(rd tokens create \
+    -u "${RD_USER}" \
+    -r '*' \
+    | tail -n 1)
+
+log "Token created"
+
 }
 
 project_exists() {
-    rd projects info -p "$PROJECT_NAME" >/dev/null 2>&1
-}
-
-key_exists() {
-    rd keys info -p "$KEY_STORAGE_PATH" >/dev/null 2>&1
+rd projects info -p "${PROJECT_NAME}" >/dev/null 2>&1
 }
 
 ensure_project() {
-    if project_exists; then
-        log "Project already exists: ${PROJECT_NAME}"
-        return
-    fi
+if project_exists; then
+log "Project already exists: ${PROJECT_NAME}"
+return
+fi
 
-    log "Creating project: ${PROJECT_NAME}"
+log "Creating project: ${PROJECT_NAME}"
 
-    rd projects create \
-        -p "${PROJECT_NAME}"
+rd projects create \
+    -p "${PROJECT_NAME}"
 
-    log "Project created"
+log "Project created"
+
 }
 
 configure_project_resources() {
-    log "Applying project.properties..."
+local config_file="${PROJECT_DIR}/etc/project.properties"
 
-    rd projects configure update \
-        -p "${PROJECT_NAME}" \
-        -f "${PROJECT_DIR}/etc/project.properties"
+if [[ ! -f "${config_file}" ]]; then
+    log "project.properties not found: ${config_file}"
+    return
+fi
 
-    log "Project configuration applied"
+log "Applying project configuration..."
+
+rd projects configure update \
+    -p "${PROJECT_NAME}" \
+    -f "${config_file}"
+
+log "Project configuration applied"
+
+}
+
+key_exists() {
+rd keys list 2>/dev/null | grep -Fq "${KEY_STORAGE_PATH}"
 }
 
 ensure_key() {
-    if [[ ! -f "${KEY_PATH}" ]]; then
-        log "SSH key not found: ${KEY_PATH}"
-        return
-    fi
+if [[ ! -f "${KEY_PATH}" ]]; then
+log "SSH key not found: ${KEY_PATH}"
+return
+fi
 
-    if key_exists; then
-        log "SSH key already exists: ${KEY_STORAGE_PATH}"
-        return
-    fi
+if key_exists; then
+    log "SSH key already exists: ${KEY_STORAGE_PATH}"
+    return
+fi
 
-    log "Importing SSH key..."
+log "Importing SSH key..."
 
-    rd keys create \
-        -t privateKey \
-        -f "${KEY_PATH}" \
-        -p "${KEY_STORAGE_PATH}"
+rd keys create \
+    -t privateKey \
+    -f "${KEY_PATH}" \
+    -p "${KEY_STORAGE_PATH}"
 
-    log "SSH key imported"
+log "SSH key imported"
+
 }
 
 import_jobs() {
-    if [[ ! -d "${JOB_DIR}" ]]; then
-        log "Job directory not found: ${JOB_DIR}"
-        return
-    fi
+if [[ ! -d "${JOB_DIR}" ]]; then
+log "Job directory not found: ${JOB_DIR}"
+return
+fi
 
-    log "Importing jobs..."
+log "Importing jobs..."
 
-    for job in "${JOB_DIR}"/*.yaml
-    do
-        [[ -f "$job" ]] || continue
+for job in "${JOB_DIR}"/*.yaml
+do
+    [[ -f "$job" ]] || continue
 
-        log "Loading job: $job"
+    log "Loading job: $job"
 
-        rd jobs load \
-            -p "${PROJECT_NAME}" \
-            -f "$job" \
-            --format yaml \
-            --duplicate update
-    done
+    rd jobs load \
+        -p "${PROJECT_NAME}" \
+        -f "$job" \
+        --format yaml \
+        --duplicate update
+done
 
-    log "Jobs imported"
-}
+log "Jobs imported"
 
-verify_api() {
-    log "Checking Rundeck API..."
-
-    rd system info >/dev/null
-
-    log "Rundeck API reachable"
 }
 
 main() {
-    verify_api
+wait_for_rundeck
 
-    ensure_project
+create_token
 
-    configure_project_resources
+ensure_project
 
-    ensure_key
+configure_project_resources
 
-    import_jobs
+ensure_key
 
-    log "Provision completed successfully"
+import_jobs
+
+log "Provision completed successfully"
+
 }
 
 main
+
