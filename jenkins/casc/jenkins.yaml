@@ -48,20 +48,16 @@ credentials:
       - credentials:
           - usernamePassword:
               id: svn-creds
-              username: "admin"
-              password: "admin"
+              username: "${LDAP_ADMIN_USER}"
+              password: "${LDAP_BIND_PASSWORD}"
               description: "SVN Admin Account"
 
           - usernamePassword:
               id: nexus-creds
-              username: "admin"
-              password: "admin"
+              username: "${LDAP_ADMIN_USER}"
+              password: "${LDAP_BIND_PASSWORD}"
               description: "Nexus Admin Account"
 
-          - string:
-              id: "npm-token"
-              secret: "YWRtaW46YWRtaW4="
-              description: "npm-token"
 unclassified:
   location:
     url: "https://jenkins.example.com"
@@ -75,8 +71,8 @@ unclassified:
     rundeckInstances:
       - name: "default"
         url: "http://rundeck:4440"
-        login: "admin"
-        password: "admin"
+        login: "${LDAP_ADMIN_USER}"
+        password: "${LDAP_BIND_PASSWORD}"
         apiVersion: "34"
 
   globalLibraries:

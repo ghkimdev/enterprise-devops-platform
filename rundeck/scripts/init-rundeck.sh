@@ -2,10 +2,10 @@
 
 set -euo pipefail
 
-export RD_URL="${RD_URL:-http://rundeck:4440}"
-export RD_USER="${RD_USER:-admin}"
-export RD_PASSWORD="${RD_PASSWORD:-admin}"
-export RD_INSECURE="${RD_INSECURE:-true}"
+export RD_URL="${RUNDECK_GRAILS_URL}"
+export RD_USER="${LDAP_ADMIN_USER}"
+export RD_PASSWORD="${LDAP_BIND_PASSWORD}"
+#export RD_INSECURE="${RD_INSECURE:-true}"
 
 PROJECT_NAME="sample"
 PROJECT_DIR="/home/rundeck/projects/${PROJECT_NAME}"

@@ -110,6 +110,7 @@ services:
     volumes:
       - rundeck_data:/home/rundeck/server/data
       - ./rundeck/projects:/home/rundeck/projects
+      - ./rundeck/keys:/home/rundeck/keys
     networks:
       - cicd-net
     healthcheck:
@@ -131,11 +132,8 @@ services:
     depends_on:
       rundeck:
         condition: service_healthy
-    environment:
-      RD_URL: http://rundeck:4440
-      RD_USER: admin
-      RD_PASSWORD: admin
-      RD_INSECURE: "true"
+    env_file:
+      - .env
     volumes:
       - ./rundeck/projects:/home/rundeck/projects
       - ./rundeck/keys:/home/rundeck/keys
