@@ -120,12 +120,12 @@ NEW_REVISION    : ${env.NEW_REVISION}
                         svn diff --summarize \
                             --username "\$SVN_USER" --password "\$SVN_PASS" --no-auth-cache \
                             -r ${env.OLD_REVISION}:${env.NEW_REVISION} \
-                            ${env.SVN_TRUNK} > changed-files.txt || true
+                            ${env.SVN_TRUNK} > changed-files.txt
 
                         svn log \
                             --username "\$SVN_USER" --password "\$SVN_PASS" --no-auth-cache \
                             -r ${env.OLD_REVISION}:${env.NEW_REVISION} \
-                            ${env.SVN_TRUNK} > commit-log.txt || true
+                            ${env.SVN_TRUNK} > commit-log.txt
                     """
                 }
             }

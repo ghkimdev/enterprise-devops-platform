@@ -162,7 +162,7 @@ pipeline {
                         -r requirements.txt
 
                     # 테스트
-                    PYTHONPATH=. pytest --junitxml=test-results.xml || true
+                    PYTHONPATH=. pytest --junitxml=test-results.xml
                 """
                 junit(allowEmptyResults: true, testResults: 'test-results.xml')
             }
@@ -281,7 +281,7 @@ ARTIFACT_URL    : ${env.ARTIFACT_URL}
 """
         }
         always {
-            sh "docker logout ${env.DOCKER_REGISTRY} || true"
+            sh "docker logout ${env.DOCKER_REGISTRY}"
             cleanWs()
         }
     }

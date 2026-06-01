@@ -292,7 +292,7 @@ DOCKER          : ${env.DOCKER_IMAGE}:${env.RELEASE_NAME}
 """
         }
         always {
-            sh "docker logout ${env.DOCKER_REGISTRY} || true"
+            sh "docker logout ${env.DOCKER_REGISTRY}"
             cleanWs()
         }
     }

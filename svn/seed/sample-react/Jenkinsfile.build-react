@@ -37,7 +37,6 @@ pipeline {
         NEXUS_CREDS        = 'nexus-creds'
         NEXUS_RAW_REPO     = 'releases'
         NPM_REGISTRY       = 'http://nexus:8081/repository/npm-group/'
-        NPM_TOKEN_CREDS    = 'npm-token'
 
         DOCKER_REGISTRY    = 'nexus.example.com:5000'
         DOCKER_IMAGE       = 'nexus.example.com:5000/sample-react'
@@ -158,11 +157,13 @@ SVN_REVISION    : ${env.SVN_REVISION}
 
         stage('Install Dependencies') {
             steps {
-                withCredentials([string(
-                    credentialsId: env.NPM_TOKEN_CREDS,
-                    variable: 'NPM_TOKEN'
+                withCredentials([usernamePassword(
+                    credentialsId: env.NEXUS_CREDS,
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
                 )]) {
                     sh '''
+                        NPM_TOKEN=$(printf '%s' "$NEXUS_USER:$NEXUS_PASS" | openssl base64 -A)
                         REGISTRY_HOST=$(echo "$NPM_REGISTRY" | sed -E 's#https?://([^/]+)/.*#\\1#')
                         cat > ~/.npmrc <<NPMRC
 registry=${NPM_REGISTRY}
@@ -179,8 +180,8 @@ NPMRC
         stage('Lint & Test') {
             steps {
                 sh '''
-                    npm run lint || true     # 운영 안정화 후 true 제거
-                    npm run test -- --run || true
+                    npm run lint
+                    npm run test -- --run
                 '''
             }
         }
@@ -306,7 +307,7 @@ DOCKER          : ${env.DOCKER_IMAGE}:${env.RELEASE_NAME}
 """
         }
         always {
-            sh "docker logout ${env.DOCKER_REGISTRY} || true"
+            sh "docker logout ${env.DOCKER_REGISTRY}"
             cleanWs()
         }
     }
