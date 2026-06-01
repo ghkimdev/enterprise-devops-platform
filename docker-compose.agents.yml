@@ -1,0 +1,16 @@
+services:
+
+  agent-node20:
+    build:
+      context: ./agents/node20
+    image: jenkins-agent-node20:1.0.0
+
+  agent-java21:
+    build:
+      context: ./agents/java17
+    image: jenkins-agent-java17:1.0.0
+
+  agent-python:
+    build:
+      context: ./agents/python
+    image: jenkins-agent-python:1.0.0

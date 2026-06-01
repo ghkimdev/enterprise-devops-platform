@@ -1,0 +1,158 @@
+# docker-compose.test-nodes.yml
+#
+# Layer 3 통합 테스트용 배포 대상 노드.
+# 3개 base image (node/java/python)을 build 단계에서 자동 생성.
+#
+# 사용:
+#   docker compose -f docker-compose.yml -f docker-compose.test-nodes.yml up -d
+#
+# 첫 실행 시 base image 3개를 build (수 분 소요). 이후엔 캐시 사용.
+#
+# 노드 매핑 (rundeck/projects/sample/etc/resources.xml과 1:1):
+#   dev-react-01    → dev-web-01.example.com    (node base)
+#   stg-react-01    → stg-web-01.example.com    (node)
+#   prod-react-01   → prod-web-01.example.com   (node)
+#   prod-react-02   → prod-web-02.example.com   (node)
+#   dev-spring-01   → dev-api-01.example.com    (java base)
+#   stg-spring-01   → stg-api-01.example.com    (java)
+#   prod-spring-01  → prod-api-01.example.com   (java)
+#   dev-fastapi-01  → dev-ml-01.example.com     (python base)
+#   stg-fastapi-01  → stg-ml-01.example.com     (python)
+#   prod-fastapi-01 → prod-ml-01.example.com    (python)
+#
+# 사전 준비:
+#   ./rundeck/keys/project/sample/deploy-key.pub  (이미 존재해야 함)
+#
+# init 스크립트는 각 노드 첫 기동 시 1회 실행:
+#   - /tmp/deploy-key.pub을 /home/deploy/.ssh/authorized_keys로 복사
+#   - 앱별 디렉토리 생성, env 파일, systemd template 배치
+
+# ─── YAML anchor로 공통 설정 모음 (각 노드 정의 반복 최소화) ───
+x-node-react: &node-react
+  build:
+    context: ./testing/layer3/docker
+    dockerfile: Dockerfile.node
+  image: cicd-node-react:1.0
+  privileged: true
+  volumes:
+    - ./rundeck/projects/sample/scripts:/var/lib/rundeck/project-scripts/sample:ro
+    - ./rundeck/keys/project/sample/deploy-key.pub:/tmp/deploy-key.pub:ro
+    - ./testing/layer3/node-init:/init:ro
+  command: ["/init/init-react-node.sh"]
+
+x-node-spring: &node-spring
+  build:
+    context: ./testing/layer3/docker
+    dockerfile: Dockerfile.java
+  image: cicd-node-java:1.0
+  volumes:
+    - ./rundeck/projects/sample/scripts:/var/lib/rundeck/project-scripts/sample:ro
+    - ./rundeck/keys/project/sample/deploy-key.pub:/tmp/deploy-key.pub:ro
+    - ./testing/layer3/node-init:/init:ro
+  command: ["/init/init-spring-node.sh"]
+
+x-node-fastapi: &node-fastapi
+  build:
+    context: ./testing/layer3/docker
+    dockerfile: Dockerfile.python
+  image: cicd-node-python:1.0
+  volumes:
+    - ./rundeck/projects/sample/scripts:/var/lib/rundeck/project-scripts/sample:ro
+    - ./rundeck/keys/project/sample/deploy-key.pub:/tmp/deploy-key.pub:ro
+    - ./testing/layer3/node-init:/init:ro
+  command: ["/init/init-fastapi-node.sh"]
+
+
+services:
+
+  # ───── React 노드 (4개) ─────
+  dev-react-01:
+    <<: *node-react
+    container_name: dev-react-01
+    hostname: dev-web-01.example.com
+    networks:
+      cicd-net:
+        aliases: [dev-web-01.example.com]
+
+  stg-react-01:
+    <<: *node-react
+    container_name: stg-react-01
+    hostname: stg-web-01.example.com
+    networks:
+      cicd-net:
+        aliases: [stg-web-01.example.com]
+
+  prod-react-01:
+    <<: *node-react
+    container_name: prod-react-01
+    hostname: prod-web-01.example.com
+    networks:
+      cicd-net:
+        aliases: [prod-web-01.example.com]
+
+  prod-react-02:
+    <<: *node-react
+    container_name: prod-react-02
+    hostname: prod-web-02.example.com
+    networks:
+      cicd-net:
+        aliases: [prod-web-02.example.com]
+
+  # ───── Spring 노드 (3개) ─────
+  dev-spring-01:
+    <<: *node-spring
+    container_name: dev-spring-01
+    hostname: dev-api-01.example.com
+    networks:
+      cicd-net:
+        aliases: [dev-api-01.example.com]
+
+  stg-spring-01:
+    <<: *node-spring
+    container_name: stg-spring-01
+    hostname: stg-api-01.example.com
+    networks:
+      cicd-net:
+        aliases: [stg-api-01.example.com]
+
+  prod-spring-01:
+    <<: *node-spring
+    container_name: prod-spring-01
+    hostname: prod-api-01.example.com
+    networks:
+      cicd-net:
+        aliases: [prod-api-01.example.com]
+
+  # ───── FastAPI 노드 (3개) ─────
+  dev-fastapi-01:
+    <<: *node-fastapi
+    container_name: dev-fastapi-01
+    hostname: dev-ml-01.example.com
+    networks:
+      cicd-net:
+        aliases: [dev-ml-01.example.com]
+
+  stg-fastapi-01:
+    <<: *node-fastapi
+    container_name: stg-fastapi-01
+    hostname: stg-ml-01.example.com
+    networks:
+      cicd-net:
+        aliases: [stg-ml-01.example.com]
+
+  prod-fastapi-01:
+    <<: *node-fastapi
+    container_name: prod-fastapi-01
+    hostname: prod-ml-01.example.com
+    networks:
+      cicd-net:
+        aliases: [prod-ml-01.example.com]
+
+
+# 기존 docker-compose.yml의 cicd-net과 자동 merge.
+networks:
+  cicd-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

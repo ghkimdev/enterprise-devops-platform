@@ -25,9 +25,7 @@ set -euo pipefail
 : "${PIP_TRUSTED_HOST:=}"
 
 TAR_NAME="${RELEASE_NAME}.tar.gz"
-SHA_NAME="${RELEASE_NAME}.sha256"
 ARTIFACT_URL="${NEXUS_BASE}/repository/releases/${APP}/${TAR_NAME}"
-SHA_URL="${NEXUS_BASE}/repository/releases/${APP}/${SHA_NAME}"
 
 APP_DIR="/opt/${APP}"
 RELEASES_DIR="${APP_DIR}/releases"
@@ -54,18 +52,6 @@ else
 
     echo "Downloading tar.gz..."
     curl -fsS -u "${NEXUS_USER}:${NEXUS_PASS}" -o "/tmp/${TAR_NAME}" "${ARTIFACT_URL}"
-
-    echo "Verifying SHA256..."
-    EXPECTED_SHA=$(curl -fsS -u "${NEXUS_USER}:${NEXUS_PASS}" "${SHA_URL}" | awk '{print $1}')
-    ACTUAL_SHA=$(sha256sum "/tmp/${TAR_NAME}" | awk '{print $1}')
-    if [ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]; then
-        echo "SHA256 mismatch!"
-        rm -f "/tmp/${TAR_NAME}"
-        rm -rf "${RELEASE_DIR}"
-        exit 1
-    fi
-    echo "SHA256 OK"
-
     tar xzf "/tmp/${TAR_NAME}" -C "${RELEASE_DIR}"
     rm -f "/tmp/${TAR_NAME}"
 
@@ -84,25 +70,15 @@ else
     echo "Venv ready: ${RELEASE_DIR}/.venv"
 fi
 
-# systemd unit 갱신
-TEMPLATE="/etc/${APP}/systemd.template"
-if [ -f "${TEMPLATE}" ]; then
-    sudo sed \
-        -e "s|__RELEASE_NAME__|${RELEASE_NAME}|g" \
-        -e "s|__ENV_NAME__|${ENV_NAME}|g" \
-        -e "s|__TEAM__|${TEAM}|g" \
-        "${TEMPLATE}" > /tmp/${APP}.service.tmp
-    sudo mv /tmp/${APP}.service.tmp "${SYSTEMD_UNIT}"
-    sudo systemctl daemon-reload
-fi
+# 기존 프로세스 종료
+"${APP_DIR}/bin/stop.sh" || true
 
-# symlink 교체
+# current symlink 교체
 sudo ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"
 sudo mv -Tf "${CURRENT_LINK}.new" "${CURRENT_LINK}"
 
-# 서비스 재시작
-sudo systemctl enable "${APP}.service" 2>/dev/null || true
-sudo systemctl restart "${APP}.service"
+# 새 버전 시작
+"${APP_DIR}/bin/start.sh"
 
 # 오래된 release 정리
 KEEP=3

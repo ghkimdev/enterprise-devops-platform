@@ -49,6 +49,14 @@
     - name: team
       required: false
       value: unknown
+    - name: nexus_user
+      secure: true
+      valueExposed: true
+      storagePath: keys/project/sample/nexus-user
+    - name: nexus_pass
+      secure: true
+      valueExposed: true
+      storagePath: keys/project/sample/nexus-pass
 
   nodefilters:
     dispatch:
@@ -69,11 +77,16 @@
           #!/bin/bash
           set -euo pipefail
 
+          NEXUS_BASE="@globals.NEXUS_BASE@"
+          PIP_INDEX_URL="@globals.PIP_INDEX_URL@"
+          PIP_TRUSTED_HOST="@globals.PIP_TRUSTED_HOST@"
           APP="@option.app@"
           RELEASE_NAME="@option.release_name@"
           APP_VERSION="@option.version@"
           ENV_NAME="@option.env@"
           TEAM="@option.team@"
+          NEXUS_USER="@option.nexus_user@"
+          NEXUS_PASS="@option.nexus_pass@"
 
           SCRIPT_DIR="/var/lib/rundeck/project-scripts/sample"
           case "$APP" in

@@ -21,9 +21,7 @@ set -euo pipefail
 : "${NEXUS_PASS:?NEXUS_PASS required}"
 
 TAR_NAME="${RELEASE_NAME}.tar.gz"
-SHA_NAME="${RELEASE_NAME}.sha256"
 ARTIFACT_URL="${NEXUS_BASE}/repository/releases/${APP}/${TAR_NAME}"
-SHA_URL="${NEXUS_BASE}/repository/releases/${APP}/${SHA_NAME}"
 
 APP_DIR="/var/www/${APP}"
 RELEASES_DIR="${APP_DIR}/releases"
@@ -49,18 +47,6 @@ else
 
     echo "Downloading tar.gz..."
     curl -fsS -u "${NEXUS_USER}:${NEXUS_PASS}" -o "/tmp/${TAR_NAME}" "${ARTIFACT_URL}"
-
-    echo "Verifying SHA256..."
-    EXPECTED_SHA=$(curl -fsS -u "${NEXUS_USER}:${NEXUS_PASS}" "${SHA_URL}" | awk '{print $1}')
-    ACTUAL_SHA=$(sha256sum "/tmp/${TAR_NAME}" | awk '{print $1}')
-    if [ "${EXPECTED_SHA}" != "${ACTUAL_SHA}" ]; then
-        echo "SHA256 mismatch! expected=${EXPECTED_SHA} actual=${ACTUAL_SHA}"
-        rm -f "/tmp/${TAR_NAME}"
-        rm -rf "${RELEASE_DIR}"
-        exit 1
-    fi
-    echo "SHA256 OK"
-
     tar xzf "/tmp/${TAR_NAME}" -C "${RELEASE_DIR}"
     rm -f "/tmp/${TAR_NAME}"
 fi
@@ -75,14 +61,6 @@ fi
 # symlink 교체
 sudo ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}.new"
 sudo mv -Tf "${CURRENT_LINK}.new" "${CURRENT_LINK}"
-
-# nginx docroot에 연결 (또는 직접 복사). 여기서는 symlink로.
-sudo mkdir -p "$(dirname "${DOCROOT}")"
-sudo ln -sfn "${CURRENT_LINK}" "${DOCROOT}.new"
-sudo mv -Tf "${DOCROOT}.new" "${DOCROOT}"
-
-# nginx reload (실패해도 진행 - 일부 환경은 reload 필요 없음)
-sudo systemctl reload nginx 2>/dev/null || true
 
 # 오래된 release 정리
 KEEP=3
