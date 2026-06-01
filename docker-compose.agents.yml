@@ -7,8 +7,8 @@ services:
 
   agent-java21:
     build:
-      context: ./agents/java17
-    image: jenkins-agent-java17:1.0.0
+      context: ./agents/java21
+    image: jenkins-agent-java21:1.0.0
 
   agent-python:
     build:
