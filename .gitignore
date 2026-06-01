@@ -1,0 +1,10 @@
+.env
+jenkins/certs
+ldap/certs
+nexus/certs
+nginx/certs
+rundeck/certs
+rundeck/keys
+svn/certs
+svn/repos
+
