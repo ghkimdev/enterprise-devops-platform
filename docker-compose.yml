@@ -229,6 +229,7 @@ services:
 # ── 네트워크 ──────────────────────────────────────────────────────────────────
 networks:
   cicd-net:
+    name: cicd-net
     driver: bridge
     ipam:
       config:

@@ -5,8 +5,7 @@ pipeline {
         docker {
             image 'jenkins-agent-python:1.0.0'
             args '''
-                --network legacy-cicd-pipeline_cicd-net
-                -v /var/run/docker.sock:/var/run/docker.sock
+                --network cicd-net
             '''
         }
     }

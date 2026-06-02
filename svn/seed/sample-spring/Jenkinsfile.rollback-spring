@@ -8,8 +8,7 @@ pipeline {
         docker {
             image 'jenkins-agent-java21:1.0.0'
             args '''
-                --network legacy-cicd-pipeline_cicd-net
-                -v /var/run/docker.sock:/var/run/docker.sock
+                --network cicd-net
             '''
         }
     }
