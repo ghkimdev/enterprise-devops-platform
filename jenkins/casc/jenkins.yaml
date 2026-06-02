@@ -2,6 +2,3 @@ jenkins:
   systemMessage: "Legacy CI/CD Pipeline"
   numExecutors: 5
 
-casc:
-  mergeStrategy: errorOnConflict
-
