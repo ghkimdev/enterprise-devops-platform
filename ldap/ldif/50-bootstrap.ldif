@@ -2,7 +2,7 @@
 # 50-bootstrap.ldif
 #
 # 변경 요약:
-#   - 기존 admin/build/deploy/test 사용자는 유지
+#   - 기존 admin 사용자는 유지
 #   - 추가: 팀별 9명 + SRE 1명 = 10명
 #       payment-team (Spring) : alice (lead), bob (dev), carol (qa)
 #       web-team     (React)  : david (lead), eve (dev), frank (qa)
@@ -31,7 +31,7 @@ objectClass: organizationalUnit
 ou: users
 
 # ─────────────────────────────────────────────────────────────────────
-# 기존 사용자 (변경 없음)
+# 기존 사용자 
 # ─────────────────────────────────────────────────────────────────────
 
 dn: cn=admin, ou=users,{{ LDAP_BASE_DN }}
@@ -44,41 +44,15 @@ objectClass: inetOrgPerson
 sn: The admin account for the Example client to use
 cn: admin
 
-dn: cn=build, ou=users,{{ LDAP_BASE_DN }}
-uid: build
-mail: build@example.com
-userPassword: {MD5}sNonVSCRjiPdYV4qdHUo8Q==
 #####
 # MD5 creds, Base64 encoded
+#userPassword: {MD5}sNonVSCRjiPdYV4qdHUo8Q==
 #userPassword: build
-objectClass: person
-objectClass: top
-objectClass: inetOrgPerson
-sn: The account to use to demonstrate managing builds only
-cn: build
 
-dn: cn=deploy, ou=users,{{ LDAP_BASE_DN }}
-uid: deploy
-mail: deploy@example.com
-userPassword: {CRYPT}de01JmlU8XXTQ
 #####
 # CRYPT creds
+#userPassword: {CRYPT}de01JmlU8XXTQ
 #userPassword: deploy
-objectClass: person
-objectClass: top
-objectClass: inetOrgPerson
-sn: The account to use to demonstrate managing deployment only
-cn: deploy
-
-dn: cn=test, ou=users,{{ LDAP_BASE_DN }}
-uid: test
-mail: test@example.com
-userPassword: test
-objectClass: person
-objectClass: top
-objectClass: inetOrgPerson
-sn: Has no role access
-cn: test
 
 # ─────────────────────────────────────────────────────────────────────
 # 신규: payment-team (Spring 담당)
@@ -215,12 +189,6 @@ objectClass: organizationalUnit
 ou: roles
 
 # 기존 Jenkins role 정의 (변경 없음)
-
-dn: cn=architect, ou=roles,{{ LDAP_BASE_DN }}
-objectClass: groupOfUniqueNames
-uniqueMember: cn=admin,ou=users,{{ LDAP_BASE_DN }}
-cn: architect
-
 dn: cn=admin, ou=roles,{{ LDAP_BASE_DN }}
 objectClass: groupOfUniqueNames
 uniqueMember: cn=admin,ou=users,{{ LDAP_BASE_DN }}
@@ -229,8 +197,6 @@ cn: admin
 dn: cn=user, ou=roles,{{ LDAP_BASE_DN }}
 objectClass: groupOfUniqueNames
 uniqueMember: cn=admin,ou=users,{{ LDAP_BASE_DN }}
-uniqueMember: cn=deploy,ou=users,{{ LDAP_BASE_DN }}
-uniqueMember: cn=build,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=alice,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=bob,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=carol,ou=users,{{ LDAP_BASE_DN }}
@@ -245,24 +211,10 @@ cn: user
 
 dn: cn=developer, ou=roles,{{ LDAP_BASE_DN }}
 objectClass: groupOfUniqueNames
-uniqueMember: cn=build,ou=users,{{ LDAP_BASE_DN }}
-uniqueMember: cn=deploy,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=bob,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=eve,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=henry,ou=users,{{ LDAP_BASE_DN }}
 cn: developer
-
-dn: cn=build, ou=roles,{{ LDAP_BASE_DN }}
-objectClass: groupOfUniqueNames
-uniqueMember: cn=admin,ou=users,{{ LDAP_BASE_DN }}
-uniqueMember: cn=build,ou=users,{{ LDAP_BASE_DN }}
-cn: build
-
-dn: cn=deploy, ou=roles,{{ LDAP_BASE_DN }}
-objectClass: groupOfUniqueNames
-uniqueMember: cn=admin,ou=users,{{ LDAP_BASE_DN }}
-uniqueMember: cn=deploy,ou=users,{{ LDAP_BASE_DN }}
-cn: deploy
 
 # ─────────────────────────────────────────────────────────────────────
 # 신규: 팀 그룹

@@ -22,3 +22,5 @@ pipeline-utility-steps:3.810.va_7672d206740
 pipeline-groovy-lib:797.v90ea_a_9b_e45a_0
 copyartifact:795.ve8e151429b_27
 rundeck:3.6.14
+docker-plugin:1316.v75635a_002b_0a_
+folder-auth:217.vd5b_18537403e
