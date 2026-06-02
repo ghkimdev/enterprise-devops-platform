@@ -1,0 +1,8 @@
+unclassified:
+  rundeckNotifier:
+    rundeckInstances:
+      - name: "default"
+        url: "http://rundeck:4440"
+        login: "${LDAP_ADMIN_USER}"
+        password: "${LDAP_BIND_PASSWORD}"
+        apiVersion: "34"

@@ -1,0 +1,4 @@
+unclassified:
+  mailer:
+    smtpHost: "mailhog"
+    smtpPort: "1025"

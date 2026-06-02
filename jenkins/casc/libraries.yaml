@@ -1,0 +1,14 @@
+unclassified:
+  globalLibraries:
+    libraries:
+      - name: "sample-shared"
+        implicit: false
+        allowVersionOverride: true
+        includeInChangesets: true
+
+        retriever:
+          modernSCM:
+            scm:
+              subversion:
+                remoteBase: "http://svn/svn/jenkins-shared-library/trunk"
+                credentialsId: "svn-creds"
