@@ -1,5 +1,18 @@
 // Jenkinsfile.checkitem-react
 
+properties([
+    parameters([
+        [
+            $class: 'ListSubversionTagsParameterDefinition',
+            name: 'BASE_TAG',
+            tagsDir: 'http://svn/svn/sample-react/tags',
+            credentialsId: 'svn-creds',
+            reverseByDate: true,
+            maxTags: '20'
+        ]
+    ])
+])
+
 pipeline {
     agent {
         docker {
@@ -14,14 +27,7 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '30'))
         disableConcurrentBuilds()
         timestamps()
-    }
-
-    parameters {
-        string(
-            name: 'BASE_TAG',
-            defaultValue: 'r-initial',
-            description: '비교 기준 release tag (예: r-initial, r-sample-react-20260525_143012)'
-        )
+        copyArtifactPermission('sample-react-build')
     }
 
     environment {
@@ -30,13 +36,14 @@ pipeline {
         SVN_TRUNK   = 'http://svn/svn/sample-react/trunk'
         SVN_TAGS    = 'http://svn/svn/sample-react/tags'
         SVN_CREDS   = 'svn-creds'
+        BUILD_JOB   = 'web/sample-react-build'
     }
 
     stages {
         stage('Validate') {
             steps {
                 script {
-                    if (!params.BASE_TAG?.trim()) {
+                    if (!env.BASE_TAG?.trim()) {
                         error 'BASE_TAG is required.'
                     }
                 }
@@ -75,7 +82,7 @@ pipeline {
                         svn info --username "\$SVN_USER" --password "\$SVN_PASS" --no-auth-cache \
                             --show-item revision ${env.SVN_TRUNK} > .new_rev.txt
                         svn info --username "\$SVN_USER" --password "\$SVN_PASS" --no-auth-cache \
-                            --show-item revision ${env.SVN_TAGS}/${params.BASE_TAG} > .old_rev.txt
+                            --show-item revision ${env.SVN_TAGS}/${env.BASE_TAG} > .old_rev.txt
                     """
                 }
                 script {
@@ -113,7 +120,7 @@ pipeline {
                 script {
                     writeJSON file: 'checkitem.json', json: [
                         app: env.APP_NAME,
-                        latest_tag: params.BASE_TAG,
+                        latest_tag: env.BASE_TAG,
                         old_revision: env.OLD_REVISION,
                         new_revision: env.NEW_REVISION,
                         svn_revision: env.NEW_REVISION,
@@ -134,7 +141,7 @@ pipeline {
 ${env.APP_NAME}
 
 ## Base Tag
-${params.BASE_TAG}
+${env.BASE_TAG}
 
 ## Revision Range
 - Old: r${env.OLD_REVISION}
@@ -166,7 +173,23 @@ EOF
                 )
             }
         }
+
+        stage('Trigger Build') {
+            steps {
+                build(
+                    job: env.BUILD_JOB,
+                    wait: false,
+                    parameters: [
+                        string(
+                            name: 'CHECKITEM_BUILD_NUMBER',
+                            value: env.BUILD_NUMBER
+                        )
+                    ]
+                )
+            }
+        }
     }
+
 
     post {
         success {

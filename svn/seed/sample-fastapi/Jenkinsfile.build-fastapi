@@ -36,14 +36,14 @@ pipeline {
 
         NEXUS_BASE         = 'http://nexus:8081'
         NEXUS_CREDS        = 'nexus-creds'
-        NEXUS_RAW_REPO     = 'releases'
+        NEXUS_RAW_REPO     = 'fastapi-releases'
         PIP_INDEX_URL      = 'http://nexus:8081/repository/pypi-group/simple'
         PIP_TRUSTED_HOST   = 'nexus'
 
         DOCKER_REGISTRY    = 'nexus.example.com:5000'
         DOCKER_IMAGE       = 'nexus.example.com:5000/sample-fastapi'
 
-        DEV_DEPLOY_JOB     = 'applications/sample-fastapi-deploy'
+        DEV_DEPLOY_JOB     = 'ml/sample-fastapi-deploy'
         AUTO_DEPLOY_ENV    = 'dev'
     }
 
@@ -62,7 +62,7 @@ pipeline {
             steps {
                 cleanWs()
                 copyArtifacts(
-                    projectName: 'applications/sample-fastapi-checkitem',
+                    projectName: 'ml/sample-fastapi-checkitem',
                     selector: specific(params.CHECKITEM_BUILD_NUMBER),
                     filter: 'checkitem.json',
                     target: '.'
@@ -259,7 +259,7 @@ EOF
                 build(
                     job: env.DEV_DEPLOY_JOB,
                     parameters: [
-                        string(name: 'APP_VERSION', value: env.TAR_NAME),
+                        string(name: 'ARTIFACT_URL', value: env.ARTIFACT_URL),
                         string(name: 'TARGET_ENV',  value: env.AUTO_DEPLOY_ENV)
                     ],
                     wait: false

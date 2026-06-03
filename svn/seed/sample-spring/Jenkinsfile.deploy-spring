@@ -28,11 +28,8 @@ pipeline {
     }
 
     parameters {
-        string(
-            name: 'APP_VERSION',
-            defaultValue: '',
-            description: 'Maven version - YYYYMMDD_HHMMSS 형식. Nexus maven-releases에 존재해야 함.'
-        )
+        nexus3Maven(name: 'ARTIFACT_URL', url: "http://nexus:8081", repository: "maven-releases", groupId: "com.example", artifactId: 'sample-spring', packaging: 'jar', credentialsId: "nexus-creds")
+
         choice(
             name: 'TARGET_ENV',
             choices: ['dev', 'stg', 'prod'],
@@ -52,17 +49,18 @@ pipeline {
 
         RUNDECK_INSTANCE   = 'default'
         RUNDECK_PROJECT    = 'sample'
-        RUNDECK_DEPLOY_JOB = 'sample:deploy-app'    // project:jobname
+        RUNDECK_DEPLOY_JOB = 'sample:deploy-spring'    // project:jobname
     }
 
     stages {
         stage('Validate Parameters') {
             steps {
                 script {
-                    if (!params.APP_VERSION?.trim()) {
+                    env.APP_VERSION = params.ARTIFACT_URL.tokenize('/')[-2]
+                    if (!env.APP_VERSION?.trim()) {
                         error 'APP_VERSION is required.'
                     }
-                    env.RELEASE_NAME = "r-${env.APP_NAME}-${params.APP_VERSION}"
+                    env.RELEASE_NAME = "r-${env.APP_NAME}-${env.APP_VERSION}"
                     currentBuild.displayName =
                         "#${env.BUILD_NUMBER} ${params.TARGET_ENV} ← ${env.RELEASE_NAME}"
                     echo """
@@ -72,7 +70,7 @@ DEPLOY REQUEST
 APP             : ${env.APP_NAME}
 TEAM            : ${env.TEAM}
 RELEASE         : ${env.RELEASE_NAME}
-MAVEN_VERSION   : ${params.APP_VERSION}
+MAVEN_VERSION   : ${env.APP_VERSION}
 TARGET ENV      : ${params.TARGET_ENV}
 ==================================================
 """
@@ -107,7 +105,7 @@ Deploy to PRODUCTION?
                     passwordVariable: 'NEXUS_PASS'
                 )]) {
                     sh """
-                        URL="${env.NEXUS_BASE}/repository/${env.MAVEN_RELEASES_REPO}/${env.MAVEN_GROUP_ID.replace('.', '/')}/${env.MAVEN_ARTIFACT_ID}/${params.APP_VERSION}/${env.MAVEN_ARTIFACT_ID}-${params.APP_VERSION}.jar"
+                        URL="${env.NEXUS_BASE}/repository/${env.MAVEN_RELEASES_REPO}/${env.MAVEN_GROUP_ID.replace('.', '/')}/${env.MAVEN_ARTIFACT_ID}/${env.APP_VERSION}/${env.MAVEN_ARTIFACT_ID}-${env.APP_VERSION}.jar"
                         echo "Checking: \$URL"
 
                         if ! curl -fsS -I --user "\$NEXUS_USER:\$NEXUS_PASS" "\$URL" > /dev/null; then
@@ -128,7 +126,7 @@ Deploy to PRODUCTION?
                     jobId                   : env.RUNDECK_DEPLOY_JOB,
                     options                 : """
 app=${env.APP_NAME}
-version=${params.APP_VERSION}
+version=${env.APP_VERSION}
 release_name=${env.RELEASE_NAME}
 env=${params.TARGET_ENV}
 team=${env.TEAM}
@@ -148,7 +146,7 @@ team=${env.TEAM}
                         app: env.APP_NAME,
                         team: env.TEAM,
                         release_name: env.RELEASE_NAME,
-                        app_version: params.APP_VERSION,
+                        app_version: env.APP_VERSION,
                         target_env: params.TARGET_ENV,
                         build_number: env.BUILD_NUMBER,
                         build_url: env.BUILD_URL

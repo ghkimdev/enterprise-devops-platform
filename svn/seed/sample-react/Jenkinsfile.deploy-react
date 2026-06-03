@@ -17,11 +17,8 @@ pipeline {
     }
 
     parameters {
-        string(
-            name: 'APP_VERSION',
-            defaultValue: '',
-            description: 'tar.gz 파일명 (예: r-sample-react-20260525_143012.tar.gz). Nexus releases에 존재해야 함.'
-        )
+        nexus3Generic(name: 'ARTIFACT_URL', url: "http://nexus:8081", repository: "react-releases", assetName: '', credentialsId: "nexus-creds")
+
         choice(
             name: 'TARGET_ENV',
             choices: ['dev', 'stg', 'prod'],
@@ -35,24 +32,25 @@ pipeline {
 
         NEXUS_BASE          = 'http://nexus:8081'
         NEXUS_CREDS         = 'nexus-creds'
-        NEXUS_RAW_REPO      = 'releases'
+        NEXUS_RAW_REPO      = 'react-releases'
 
         RUNDECK_INSTANCE    = 'default'
-        RUNDECK_DEPLOY_JOB  = 'sample:deploy-app'
+        RUNDECK_DEPLOY_JOB  = 'sample:deploy-react'
     }
 
     stages {
         stage('Validate Parameters') {
             steps {
                 script {
-                    if (!params.APP_VERSION?.trim()) {
+                    env.APP_VERSION = params.ARTIFACT_URL.tokenize('/')[-1]
+                    if (!env.APP_VERSION?.trim()) {
                         error 'APP_VERSION is required (예: r-sample-react-20260525_143012.tar.gz)'
                     }
-                    if (!params.APP_VERSION.endsWith('.tar.gz')) {
+                    if (!env.APP_VERSION.endsWith('.tar.gz')) {
                         error 'APP_VERSION must end with .tar.gz'
                     }
                     // tar.gz를 떼서 release_name 추출
-                    env.RELEASE_NAME = params.APP_VERSION.replaceAll(/\.tar\.gz$/, '')
+                    env.RELEASE_NAME = env.APP_VERSION.replaceAll(/\.tar\.gz$/, '')
                     currentBuild.displayName =
                         "#${env.BUILD_NUMBER} ${params.TARGET_ENV} ← ${env.RELEASE_NAME}"
                     echo """
@@ -86,7 +84,7 @@ TARGET ENV      : ${params.TARGET_ENV}
                     passwordVariable: 'NEXUS_PASS'
                 )]) {
                     sh """
-                        URL="${env.NEXUS_BASE}/repository/${env.NEXUS_RAW_REPO}/${env.APP_NAME}/${params.APP_VERSION}"
+                        URL="${env.NEXUS_BASE}/repository/${env.NEXUS_RAW_REPO}/${env.APP_NAME}/${env.APP_VERSION}"
                         if ! curl -fsS -I --user "\$NEXUS_USER:\$NEXUS_PASS" "\$URL" > /dev/null; then
                             echo "Artifact not found: \$URL"
                             exit 1
@@ -104,7 +102,7 @@ TARGET ENV      : ${params.TARGET_ENV}
                     jobId                   : env.RUNDECK_DEPLOY_JOB,
                     options                 : """
 app=${env.APP_NAME}
-version=${params.APP_VERSION}
+version=${env.APP_VERSION}
 release_name=${env.RELEASE_NAME}
 env=${params.TARGET_ENV}
 team=${env.TEAM}

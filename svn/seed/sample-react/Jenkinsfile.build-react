@@ -35,13 +35,13 @@ pipeline {
 
         NEXUS_BASE         = 'http://nexus:8081'
         NEXUS_CREDS        = 'nexus-creds'
-        NEXUS_RAW_REPO     = 'releases'
+        NEXUS_RAW_REPO     = 'react-releases'
         NPM_REGISTRY       = 'http://nexus:8081/repository/npm-group/'
 
         DOCKER_REGISTRY    = 'nexus.example.com:5000'
         DOCKER_IMAGE       = 'nexus.example.com:5000/sample-react'
 
-        DEV_DEPLOY_JOB     = 'applications/sample-react-deploy'
+        DEV_DEPLOY_JOB     = 'web/sample-react-deploy'
         AUTO_DEPLOY_ENV    = 'dev'
     }
 
@@ -60,7 +60,7 @@ pipeline {
             steps {
                 cleanWs()
                 copyArtifacts(
-                    projectName: 'applications/sample-react-checkitem',
+                    projectName: 'web/sample-react-checkitem',
                     selector: specific(params.CHECKITEM_BUILD_NUMBER),
                     filter: 'checkitem.json',
                     target: '.'
@@ -285,7 +285,7 @@ EOF
                     job: env.DEV_DEPLOY_JOB,
                     parameters: [
                         // React/FastAPI는 deploy에 tar.gz 파일명 전달
-                        string(name: 'APP_VERSION', value: env.TAR_NAME),
+                        string(name: 'ARTIFACT_URL', value: env.ARTIFACT_URL),
                         string(name: 'TARGET_ENV',  value: env.AUTO_DEPLOY_ENV)
                     ],
                     wait: false

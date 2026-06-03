@@ -52,7 +52,7 @@ pipeline {
         DOCKER_REGISTRY    = 'nexus.example.com:5000'
         DOCKER_IMAGE       = 'nexus.example.com:5000/sample-spring'
 
-        DEV_DEPLOY_JOB     = 'applications/sample-spring-deploy'
+        DEV_DEPLOY_JOB     = 'payment/sample-spring-deploy'
         AUTO_DEPLOY_ENV    = 'dev'
     }
 
@@ -71,7 +71,7 @@ pipeline {
             steps {
                 cleanWs()
                 copyArtifacts(
-                    projectName: 'applications/sample-spring-checkitem',
+                    projectName: 'payment/sample-spring-checkitem',
                     selector: specific(params.CHECKITEM_BUILD_NUMBER),
                     filter: 'checkitem.json',
                     target: '.'
@@ -268,7 +268,7 @@ SVN_REVISION    : ${env.SVN_REVISION}
                 build(
                     job: env.DEV_DEPLOY_JOB,
                     parameters: [
-                        string(name: 'APP_VERSION', value: env.MAVEN_VERSION),
+                        string(name: 'ARTIFACT_URL', value: env.ARTIFACT_URL),
                         string(name: 'TARGET_ENV',  value: env.AUTO_DEPLOY_ENV)
                     ],
                     wait: false
