@@ -1,0 +1,15 @@
+@Library('cicd-shared@trunk') _
+
+deployPipeline([
+    artifactType    : 'raw',
+    appName         : 'sample-fastapi',
+    team            : 'ml-team',
+    agentImage      : 'jenkins-agent-python:1.0.0',
+
+    nexusBase       : 'http://nexus:8081',
+    nexusCreds      : 'nexus-creds',
+    rawRepo         : 'fastapi-releases',
+
+    rundeckInstance : 'default',
+    rundeckDeployJob: 'sample:deploy-fastapi'
+])

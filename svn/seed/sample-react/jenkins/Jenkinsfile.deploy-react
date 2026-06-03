@@ -1,0 +1,15 @@
+@Library('cicd-shared@trunk') _
+
+deployPipeline([
+    artifactType    : 'raw',
+    appName         : 'sample-react',
+    team            : 'web-team',
+    agentImage      : 'jenkins-agent-node20:1.0.0',
+
+    nexusBase       : 'http://nexus:8081',
+    nexusCreds      : 'nexus-creds',
+    rawRepo         : 'react-releases',
+
+    rundeckInstance : 'default',
+    rundeckDeployJob: 'sample:deploy-react'
+])

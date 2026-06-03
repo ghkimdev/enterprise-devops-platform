@@ -1,0 +1,17 @@
+@Library('cicd-shared@trunk') _
+
+deployPipeline([
+    artifactType      : 'maven',
+    appName           : 'sample-spring',
+    team              : 'payment-team',
+    agentImage        : 'jenkins-agent-java21:1.0.0',
+
+    nexusBase         : 'http://nexus:8081',
+    nexusCreds        : 'nexus-creds',
+    mavenReleasesRepo : 'maven-releases',
+    mavenGroupId      : 'com.example',
+    mavenArtifactId   : 'sample-spring',
+
+    rundeckInstance   : 'default',
+    rundeckDeployJob  : 'sample:deploy-spring'
+])

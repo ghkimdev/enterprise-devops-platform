@@ -1,0 +1,12 @@
+@Library('cicd-shared@trunk') _
+
+checkitemPipeline([
+    appName              : 'sample-react',
+    agentImage           : 'jenkins-agent-node20:1.0.0',
+    svnBase              : 'http://svn/svn/sample-react',
+    svnTrunk             : 'http://svn/svn/sample-react/trunk',
+    svnTags              : 'http://svn/svn/sample-react/tags',
+    svnCreds             : 'svn-creds',
+    buildJob             : 'web/02.sample-react-build',
+    copyArtifactPermission: '02.sample-react-build'
+])

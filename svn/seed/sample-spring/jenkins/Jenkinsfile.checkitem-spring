@@ -1,0 +1,12 @@
+@Library('cicd-shared@trunk') _
+
+checkitemPipeline([
+    appName              : 'sample-spring',
+    agentImage           : 'jenkins-agent-java21:1.0.0',
+    svnBase              : 'http://svn/svn/sample-spring',
+    svnTrunk             : 'http://svn/svn/sample-spring/trunk',
+    svnTags              : 'http://svn/svn/sample-spring/tags',
+    svnCreds             : 'svn-creds',
+    buildJob             : 'payment/02.sample-spring-build',
+    copyArtifactPermission: '02.sample-spring-build'
+])

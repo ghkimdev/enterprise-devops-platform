@@ -1,7 +1,7 @@
 unclassified:
   globalLibraries:
     libraries:
-      - name: "sample-shared"
+      - name: "cicd-shared"
         implicit: false
         allowVersionOverride: true
         includeInChangesets: true
@@ -10,5 +10,7 @@ unclassified:
           modernSCM:
             scm:
               subversion:
-                remoteBase: "http://svn/svn/jenkins-shared-library/trunk"
+                remoteBase: "http://svn/svn/cicd-shared-library"
                 credentialsId: "svn-creds"
+                workspaceUpdater:
+                  checkoutUpdater: {}

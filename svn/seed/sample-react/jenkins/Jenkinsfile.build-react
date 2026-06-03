@@ -1,0 +1,23 @@
+@Library('cicd-shared@trunk') _
+
+buildPipeline([
+    stack          : 'react',
+    appName        : 'sample-react',
+    agentImage     : 'jenkins-agent-node20:1.0.0',
+
+    svnTrunk       : 'http://svn/svn/sample-react/trunk',
+    svnTags        : 'http://svn/svn/sample-react/tags',
+    svnCreds       : 'svn-creds',
+
+    nexusBase      : 'http://nexus:8081',
+    nexusCreds     : 'nexus-creds',
+    rawRepo        : 'react-releases',
+    npmRegistry    : 'http://nexus:8081/repository/npm-group/',
+
+    dockerRegistry : 'nexus.example.com:5000',
+    dockerImage    : 'nexus.example.com:5000/sample-react',
+
+    checkitemJob   : 'web/01.sample-react-checkitem',
+    devDeployJob   : 'web/03.sample-react-deploy',
+    autoDeployEnv  : 'dev'
+])

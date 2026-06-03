@@ -1,31 +1,5 @@
 println "Starting Seed Job..."
 
-
-// ─────────────────────────────────────────────
-// Root Folder
-// ─────────────────────────────────────────────
-//folder('applications') {
-//    displayName('Applications')
-//    description('Application Pipelines')
-
-//    authorization {
-
-//        ['payment-team','web-team','ml-team'].each { g ->
-//            groupPermissions(g, [
-//                'hudson.model.Item.Read',
-//                'hudson.model.Item.Discover'
-//            ])
-//        }
-
-//        groupPermissions('admin', [
-//            'hudson.model.Item.Read',
-//            'hudson.model.Item.Discover',
-//            'hudson.model.Item.Configure',
-//            'hudson.model.Item.Delete'
-//        ])
-//    }
-//}
-
 // ─────────────────────────────────────────────
 // Team Folder 생성
 // ─────────────────────────────────────────────
@@ -54,7 +28,6 @@ teams.each { cfg ->
 
             groupPermissions(cfg.group, [
                 'hudson.model.Item.Read',
-                'hudson.model.Item.Discover',
                 'hudson.model.Item.Build',
                 'hudson.model.Item.Cancel',
                 'hudson.model.Item.Workspace'
@@ -62,7 +35,6 @@ teams.each { cfg ->
 
             groupPermissions('admin', [
                 'hudson.model.Item.Read',
-                'hudson.model.Item.Discover',
                 'hudson.model.Item.Build',
                 'hudson.model.Item.Cancel',
                 'hudson.model.Item.Configure',
@@ -87,10 +59,11 @@ def createPipelineJob(
         definition {
             cpsScm {
 
-                lightweight(false)
+                lightweight(true)
 
                 scm {
                     svn {
+                        checkoutStrategy(SvnCheckoutStrategy.CHECKOUT)
                         location(repo) {
                             credentials('svn-creds')
                         }
@@ -142,22 +115,22 @@ apps.each { cfg ->
     def app = cfg.app
     def team = cfg.team
 
-    def repo = "http://svn/svn/${app}/trunk"
+    def repo = "http://svn/svn/${app}/trunk/jenkins"
 
     createPipelineJob(
-        "${team}/${app}-checkitem",
+        "${team}/01.${app}-checkitem",
         repo,
         "Jenkinsfile.checkitem-${cfg.script}"
     )
 
     createPipelineJob(
-        "${team}/${app}-build",
+        "${team}/02.${app}-build",
         repo,
         "Jenkinsfile.build-${cfg.script}"
     )
 
     createPipelineJob(
-        "${team}/${app}-deploy",
+        "${team}/03.${app}-deploy",
         repo,
         "Jenkinsfile.deploy-${cfg.script}"
     )

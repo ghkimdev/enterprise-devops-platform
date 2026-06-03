@@ -1,0 +1,24 @@
+@Library('cicd-shared@trunk') _
+
+buildPipeline([
+    stack          : 'fastapi',
+    appName        : 'sample-fastapi',
+    agentImage     : 'jenkins-agent-python:1.0.0',
+
+    svnTrunk       : 'http://svn/svn/sample-fastapi/trunk',
+    svnTags        : 'http://svn/svn/sample-fastapi/tags',
+    svnCreds       : 'svn-creds',
+
+    nexusBase      : 'http://nexus:8081',
+    nexusCreds     : 'nexus-creds',
+    rawRepo        : 'fastapi-releases',
+    pipIndexUrl    : 'http://nexus:8081/repository/pypi-group/simple',
+    pipTrustedHost : 'nexus',
+
+    dockerRegistry : 'nexus.example.com:5000',
+    dockerImage    : 'nexus.example.com:5000/sample-fastapi',
+
+    checkitemJob   : 'ml/01.sample-fastapi-checkitem',
+    devDeployJob   : 'ml/03.sample-fastapi-deploy',
+    autoDeployEnv  : 'dev'
+])
