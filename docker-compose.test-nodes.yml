@@ -152,7 +152,5 @@ services:
 # 기존 docker-compose.yml의 cicd-net과 자동 merge.
 networks:
   cicd-net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/24
+    external: true
+    name: cicd-net
