@@ -156,6 +156,30 @@ EOF
                 }
             }
 
+            stage('Summary') {
+                steps {
+                    script {
+                        def changed = readFile('changed-files.txt').trim()
+                        def commits = readFile('commit-log.txt').trim()
+                        echo """
+==================================================
+CHECKITEM SUMMARY — ${config.appName}
+==================================================
+BASE_TAG     : ${env.BASE_TAG}
+REVISION     : r${env.OLD_REVISION} → r${env.NEW_REVISION}
+CHECKITEM #  : ${env.BUILD_NUMBER}
+
+[ Changed Files ]
+${changed}
+
+[ Commit Log ]
+${commits}
+
+=================================================="""
+                    }
+                }
+            }
+
             stage('Trigger Build') {
                 steps {
                     build(
@@ -178,7 +202,6 @@ CHECKITEM SUCCESS — ${config.appName}
 NEW_REVISION    : ${env.NEW_REVISION}
 CHECKITEM #     : ${env.BUILD_NUMBER}
 
-다음 단계: ${config.buildJob} 잡을 CHECKITEM_BUILD_NUMBER=${env.BUILD_NUMBER} 로 실행
 =================================================="""
             }
             always {

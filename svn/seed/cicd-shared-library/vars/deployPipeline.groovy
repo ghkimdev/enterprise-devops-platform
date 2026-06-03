@@ -115,6 +115,7 @@ TARGET ENV      : ${params.TARGET_ENV}"""
 
             stage('Deploy via Rundeck') {
                 steps {
+                    echo "Rundeck 잡 호출: ${config.rundeckDeployJob} (env=${params.TARGET_ENV}, release=${env.RELEASE_NAME})"
                     step([
                         $class                  : 'RundeckNotifier',
                         rundeckInstance         : config.rundeckInstance,
@@ -148,6 +149,23 @@ team=${config.team}
                         ], pretty: 2
                     }
                     archiveArtifacts artifacts: 'deploy-info.json', fingerprint: true
+                }
+            }
+
+            stage('Summary') {
+                steps {
+                    script {
+                        def info = readJSON file: 'deploy-info.json'
+                        def rows = info.collect { k, v -> "  ${k.padRight(20)}: ${v}" }.join('\n')
+                        echo """
+==================================================
+DEPLOY SUMMARY — ${config.appName}
+==================================================
+${rows}
+
+배포 방식: Rundeck (${config.rundeckDeployJob})
+=================================================="""
+                    }
                 }
             }
         }

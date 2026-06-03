@@ -78,7 +78,7 @@ def createReleaseTag(Map cfg) {
             fi
             svn copy \
                 --username "\$SVN_USER" --password "\$SVN_PASS" --no-auth-cache \
-                -m "Create release ${cfg.releaseName} from trunk@r${cfg.svnRevision}" \
+                -m "chore(release): Create release ${cfg.releaseName} from trunk@r${cfg.svnRevision}" \
                 -r ${cfg.svnRevision} \
                 "${cfg.svnTrunk}" \
                 "${cfg.releaseTag}"

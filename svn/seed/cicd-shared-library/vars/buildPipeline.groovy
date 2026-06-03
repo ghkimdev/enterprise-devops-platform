@@ -200,6 +200,23 @@ SVN_REVISION    : ${env.SVN_REVISION}"""
                 }
             }
 
+            stage('Summary') {
+                steps {
+                    script {
+                        def info = readJSON file: 'build-info.json'
+                        def rows = info.collect { k, v -> "  ${k.padRight(24)}: ${v}" }.join('\n')
+                        echo """
+==================================================
+BUILD SUMMARY — ${config.appName}
+==================================================
+${rows}
+
+다음 단계: ${config.devDeployJob} (${config.autoDeployEnv}) 자동 트리거
+=================================================="""
+                    }
+                }
+            }
+
             stage('Trigger Dev Deploy') {
                 steps {
                     build(
