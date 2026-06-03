@@ -30,36 +30,36 @@
 # ─── YAML anchor로 공통 설정 모음 (각 노드 정의 반복 최소화) ───
 x-node-react: &node-react
   build:
-    context: ./testing/layer3/docker
+    context: ./nodes/docker
     dockerfile: Dockerfile.node
   image: cicd-node-react:1.0
   privileged: true
   volumes:
     - ./rundeck/projects/sample/scripts:/var/lib/rundeck/project-scripts/sample:ro
     - ./rundeck/keys/project/sample/deploy-key.pub:/tmp/deploy-key.pub:ro
-    - ./testing/layer3/node-init:/init:ro
+    - ./nodes/scripts:/init:ro
   command: ["/init/init-react-node.sh"]
 
 x-node-spring: &node-spring
   build:
-    context: ./testing/layer3/docker
+    context: ./nodes/docker
     dockerfile: Dockerfile.java
   image: cicd-node-java:1.0
   volumes:
     - ./rundeck/projects/sample/scripts:/var/lib/rundeck/project-scripts/sample:ro
     - ./rundeck/keys/project/sample/deploy-key.pub:/tmp/deploy-key.pub:ro
-    - ./testing/layer3/node-init:/init:ro
+    - ./nodes/scripts:/init:ro
   command: ["/init/init-spring-node.sh"]
 
 x-node-fastapi: &node-fastapi
   build:
-    context: ./testing/layer3/docker
+    context: ./nodes/docker
     dockerfile: Dockerfile.python
   image: cicd-node-python:1.0
   volumes:
     - ./rundeck/projects/sample/scripts:/var/lib/rundeck/project-scripts/sample:ro
     - ./rundeck/keys/project/sample/deploy-key.pub:/tmp/deploy-key.pub:ro
-    - ./testing/layer3/node-init:/init:ro
+    - ./nodes/scripts:/init:ro
   command: ["/init/init-fastapi-node.sh"]
 
 

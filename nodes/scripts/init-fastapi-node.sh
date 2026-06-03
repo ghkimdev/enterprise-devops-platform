@@ -1,6 +1,5 @@
 #!/bin/bash
 # FastAPI 배포 노드 init.
-# Dockerfile에서 이미 python3/sshd/deploy 사용자 셋업됨.
 
 set -euo pipefail
 
