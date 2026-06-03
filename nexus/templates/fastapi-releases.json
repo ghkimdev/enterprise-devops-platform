@@ -1,5 +1,5 @@
 {
-  "name": "releases",
+  "name": "fastapi-releases",
   "online": true,
   "storage": {
     "blobStoreName": "default",

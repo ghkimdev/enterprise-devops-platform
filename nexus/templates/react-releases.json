@@ -1,0 +1,15 @@
+{
+  "name": "react-releases",
+  "online": true,
+  "storage": {
+    "blobStoreName": "default",
+    "strictContentTypeValidation": true,
+    "writePolicy": "ALLOW_ONCE"
+  },
+  "cleanup": {
+    "policyNames": []
+  },
+  "raw": {
+    "contentDisposition": "ATTACHMENT"
+  }
+}
