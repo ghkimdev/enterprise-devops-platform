@@ -25,14 +25,13 @@ set -euo pipefail
 : "${PIP_TRUSTED_HOST:=}"
 
 TAR_NAME="${RELEASE_NAME}.tar.gz"
-ARTIFACT_URL="${NEXUS_BASE}/repository/releases/${APP}/${TAR_NAME}"
+ARTIFACT_URL="${NEXUS_BASE}/repository/fastapi-releases/${APP}/${TAR_NAME}"
 
 APP_DIR="/opt/${APP}"
 RELEASES_DIR="${APP_DIR}/releases"
 RELEASE_DIR="${RELEASES_DIR}/${RELEASE_NAME}"
 CURRENT_LINK="${APP_DIR}/current"
 LOGS_DIR="${APP_DIR}/logs"
-SYSTEMD_UNIT="/etc/systemd/system/${APP}.service"
 
 echo "=================================================="
 echo "DEPLOY ${APP} → ${ENV_NAME}"

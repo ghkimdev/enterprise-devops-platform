@@ -248,15 +248,23 @@ fi
 
 echo "[INFO] Provisioning raw repository..."
 
-if repository_exists "releases"; then
+if repository_exists "react-releases"; then
     echo "[SKIP] releases already exists"
 else
     api_request \
         POST \
         "/service/rest/v1/repositories/raw/hosted" \
-        "/templates/raw-hosted.json"
+        "/templates/react-releases.json"
 fi
 
+if repository_exists "fastapi-releases"; then
+    echo "[SKIP] releases already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/repositories/raw/hosted" \
+        "/templates/fastapi-releases.json"
+fi
 # -----------------------------------------------------------------------------
 
 echo "[INFO] Provisioning PyPI repository..."

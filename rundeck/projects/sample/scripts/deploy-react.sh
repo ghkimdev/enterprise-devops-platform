@@ -21,7 +21,7 @@ set -euo pipefail
 : "${NEXUS_PASS:?NEXUS_PASS required}"
 
 TAR_NAME="${RELEASE_NAME}.tar.gz"
-ARTIFACT_URL="${NEXUS_BASE}/repository/releases/${APP}/${TAR_NAME}"
+ARTIFACT_URL="${NEXUS_BASE}/repository/react-releases/${APP}/${TAR_NAME}"
 
 APP_DIR="/var/www/${APP}"
 RELEASES_DIR="${APP_DIR}/releases"
