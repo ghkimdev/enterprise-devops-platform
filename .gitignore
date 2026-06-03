@@ -7,4 +7,5 @@ rundeck/certs
 rundeck/keys
 svn/certs
 svn/repos
+svn/logs
 

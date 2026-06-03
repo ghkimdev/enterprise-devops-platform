@@ -21,8 +21,6 @@ COPY docker/entrypoint.sh /entrypoint.sh
 COPY docker/init-svn.sh /init-svn.sh
 RUN chmod +x /entrypoint.sh /init-svn.sh
 
-RUN mkdir -p /var/svn/repos
-
 EXPOSE 80
 
 ENTRYPOINT ["/entrypoint.sh"]
