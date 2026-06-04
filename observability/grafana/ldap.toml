@@ -1,0 +1,28 @@
+# Grafana LDAP — 기존 OpenLDAP로 SSO. 비밀번호는 $__env{}로 주입(파일에 평문 금지).
+[[servers]]
+host          = "ldap"
+port          = 636
+use_ssl       = true
+start_tls     = false
+ssl_skip_verify = true                 # 사설 CA. 운영에선 root_ca_cert 지정 권장
+bind_dn       = "cn=admin,dc=example,dc=com"
+bind_password = "$__env{LDAP_BIND_PASSWORD}"
+search_filter = "(uid=%s)"
+search_base_dns = ["ou=users,dc=example,dc=com"]
+
+[servers.attributes]
+member_of = "memberOf"
+email     = "mail"
+name      = "givenName"
+surname   = "sn"
+username  = "uid"
+
+# 그룹 → Grafana 역할. memberOf 오버레이가 없으면 fallback(*)으로 Viewer 부여.
+[[servers.group_mappings]]
+group_dn = "cn=admin,ou=roles,dc=example,dc=com"
+org_role = "Admin"
+grafana_admin = true
+
+[[servers.group_mappings]]
+group_dn = "*"
+org_role = "Viewer"

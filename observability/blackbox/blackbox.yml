@@ -1,0 +1,22 @@
+modules:
+  # https 엔드포인트 프로빙: 도달성 + TLS 핸드셰이크(인증서 만료 메트릭 수집)
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      method: GET
+      preferred_ip_protocol: ip4
+      # 인증 벽(로그인 리다이렉트/403)도 "응답함"으로 인정 — TLS·도달성 확인이 목적
+      valid_status_codes: [200, 301, 302, 401, 403]
+      tls_config:
+        # 사설 CA로 체인 검증(신뢰까지 확인). server_name은 타깃 호스트에서 자동.
+        ca_file: /etc/blackbox_exporter/ca.crt
+
+  # 배포 노드의 앱 헬스 엔드포인트(평문 HTTP, 200 기대)
+  http_health:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      valid_status_codes: [200]      # Spring actuator는 DOWN 시 503 → 자동 감지
+      preferred_ip_protocol: ip4

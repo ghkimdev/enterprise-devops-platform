@@ -57,6 +57,7 @@ def call(Map config) {
 
         environment {
             APP_NAME = "${config.appName}"
+            TEAM     = "${config.team}"
         }
 
         stages {
@@ -184,6 +185,7 @@ SVN_REVISION    : ${env.SVN_REVISION}"""
                     script {
                         writeJSON file: 'build-info.json', json: [
                             app: config.appName,
+                            team: config.team,
                             release_name: env.RELEASE_NAME,
                             maven_version: env.MAVEN_VERSION,
                             svn_revision: env.SVN_REVISION,
@@ -243,6 +245,21 @@ DOCKER          : ${config.dockerImage}:${env.RELEASE_NAME}
 =================================================="""
             }
             always {
+                script {
+                    metricsHelper.record([
+                        kind       : 'build',
+                        app        : config.appName,
+                        team       : config.team,
+                        env        : config.autoDeployEnv,
+                        result     : currentBuild.currentResult,
+                        durationSec: ((currentBuild.duration ?:
+                                      (System.currentTimeMillis() - currentBuild.startTimeInMillis)).intdiv(1000)),
+                        infoFile   : 'build-info.json'
+                    ])
+                }
+                sh "docker logout ${config.dockerRegistry}"
+                cleanWs()
+            }
                 sh "docker logout ${config.dockerRegistry}"
                 cleanWs()
             }

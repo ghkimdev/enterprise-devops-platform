@@ -2,6 +2,7 @@
 
 checkitemPipeline([
     appName              : 'sample-fastapi',
+    team                 : 'ml-team',
     agentImage           : 'jenkins-agent-python:1.0.0',
     svnBase              : 'http://svn/svn/sample-fastapi',
     svnTrunk             : 'http://svn/svn/sample-fastapi/trunk',

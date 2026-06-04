@@ -182,6 +182,18 @@ ENV         : ${params.TARGET_ENV}
 =================================================="""
             }
             always {
+                script {
+                    metricsHelper.record([
+                        kind       : 'deploy',
+                        app        : config.appName,
+                        team       : config.team,
+                        env        : params.TARGET_ENV,
+                        result     : currentBuild.currentResult,
+                        durationSec: ((currentBuild.duration ?:
+                                      (System.currentTimeMillis() - currentBuild.startTimeInMillis)).intdiv(1000)),
+                        infoFile   : 'deploy-info.json'
+                    ])
+                }
                 cleanWs()
             }
         }

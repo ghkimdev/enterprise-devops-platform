@@ -11,15 +11,21 @@ services:
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/certs:/etc/nginx/certs
-    networks:
-      - cicd-net
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
- 
+    networks:
+      cicd-net:                 # 기존 "- cicd-net" 리스트형을 이 맵형으로 교체
+        aliases:
+          - jenkins.example.com
+          - nexus.example.com
+          - rundeck.example.com
+          - svn.example.com
+          - grafana.example.com 
+
   jenkins:
     build:
       context: ./jenkins

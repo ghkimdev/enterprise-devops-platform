@@ -3,6 +3,7 @@
 buildPipeline([
     stack             : 'spring',
     appName           : 'sample-spring',
+    team              : 'payment-team',
     agentImage        : 'jenkins-agent-java21:1.0.0',
 
     svnTrunk          : 'http://svn/svn/sample-spring/trunk',

@@ -43,6 +43,7 @@ def call(Map config) {
 
         environment {
             APP_NAME  = "${config.appName}"
+            TEAM      = "${config.team}"
             SVN_TRUNK = "${config.svnTrunk}"
             SVN_TAGS  = "${config.svnTags}"
             SVN_CREDS = "${config.svnCreds}"
@@ -104,6 +105,7 @@ NEW_REVISION    : ${env.NEW_REVISION}
                     script {
                         writeJSON file: 'checkitem.json', json: [
                             app: config.appName,
+                            team: config.team,
                             latest_tag: env.BASE_TAG,
                             old_revision: env.OLD_REVISION,
                             new_revision: env.NEW_REVISION,
@@ -205,6 +207,18 @@ CHECKITEM #     : ${env.BUILD_NUMBER}
 =================================================="""
             }
             always {
+                script {
+                    metricsHelper.record([
+                        kind       : 'checkitem',
+                        app        : config.appName,
+                        team       : config.team,
+                        env        : params.TARGET_ENV,
+                        result     : currentBuild.currentResult,
+                        durationSec: ((currentBuild.duration ?:
+                                      (System.currentTimeMillis() - currentBuild.startTimeInMillis)).intdiv(1000)),
+                        infoFile   : 'checkitem-info.json'
+                    ])
+                }
                 cleanWs()
             }
         }

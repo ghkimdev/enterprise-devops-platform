@@ -3,6 +3,7 @@
 buildPipeline([
     stack          : 'react',
     appName        : 'sample-react',
+    team           : 'web-team',
     agentImage     : 'jenkins-agent-node20:1.0.0',
 
     svnTrunk       : 'http://svn/svn/sample-react/trunk',

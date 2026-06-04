@@ -1,0 +1,55 @@
+# 알림을 기존 MailHog SMTP(1025)로 전송. UI: http://localhost:8025
+# team 라벨(파이프라인 메트릭에서 전파)로 팀 메일에 라우팅 — post-commit 훅 매핑과 동일.
+
+route:
+  receiver: 'team-default'
+  group_by: ['alertname', 'app', 'team']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+  routes:
+    - matchers: ['team="payment"']
+      receiver: 'payment-team'
+    - matchers: ['team="web"']
+      receiver: 'web-team'
+    - matchers: ['team="ml"']
+      receiver: 'ml-team'
+
+# critical이 울리면 같은 app/alertname의 warning은 억제(중복 알림 방지)
+inhibit_rules:
+  - source_matchers: ['severity="critical"']
+    target_matchers: ['severity="warning"']
+    equal: ['alertname', 'app']
+
+receivers:
+  - name: 'team-default'
+    email_configs:
+      - to: 'devops@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'mailhog:1025'
+        require_tls: false
+        send_resolved: true
+
+  - name: 'payment-team'
+    email_configs:
+      - to: 'payment-team@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'mailhog:1025'
+        require_tls: false
+        send_resolved: true
+
+  - name: 'web-team'
+    email_configs:
+      - to: 'web-team@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'mailhog:1025'
+        require_tls: false
+        send_resolved: true
+
+  - name: 'ml-team'
+    email_configs:
+      - to: 'ml-team@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'mailhog:1025'
+        require_tls: false
+        send_resolved: true

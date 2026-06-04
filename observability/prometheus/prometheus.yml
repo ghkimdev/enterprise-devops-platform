@@ -1,0 +1,119 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: cicd
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ── CI/CD 이력 (Jenkins 파이프라인이 push) ──
+  # honor_labels: true 필수 — 푸시된 app/team/env 라벨을 Prometheus가 덮어쓰지 않게
+  - job_name: pushgateway
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']
+
+  # ── 인프라 메트릭 (즉시 동작) ──
+  - job_name: cadvisor
+    static_configs:
+      - targets: ['cadvisor:8080']
+    # 배포 노드 컨테이너(dev-spring-01 등)에 env/stack/tier 라벨 부여.
+    # → Grafana에서 container_*{tier="deploy-node", env="dev", stack="spring"} 로 필터
+    metric_relabel_configs:
+      - source_labels: [name]
+        regex: '(dev|stg|prod)-(react|spring|fastapi)-\d+'
+        target_label: env
+        replacement: '$1'
+      - source_labels: [name]
+        regex: '(dev|stg|prod)-(react|spring|fastapi)-\d+'
+        target_label: stack
+        replacement: '$2'
+      - source_labels: [name]
+        regex: '(dev|stg|prod)-(react|spring|fastapi)-\d+'
+        target_label: tier
+        replacement: 'deploy-node'
+
+  - job_name: node-exporter
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # ── Jenkins (prometheus 플러그인) ──
+  - job_name: jenkins
+    metrics_path: /prometheus/            # 끝 슬래시 필수 — 없으면 302 리다이렉트
+    static_configs:
+      - targets: ['jenkins:8080']
+
+  # ── 엔드포인트 도달성 + 인증서 만료 (blackbox) ──
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://jenkins.example.com
+          - https://nexus.example.com
+          - https://rundeck.example.com
+          - https://svn.example.com
+          - https://grafana.example.com
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # ── 배포 노드 앱 헬스 (blackbox, dev) — 배포가 실제로 살아있는가 ──
+  - job_name: blackbox-node-health
+    metrics_path: /probe
+    params:
+      module: [http_health]
+    static_configs:
+      - targets: ['http://dev-spring-01:8080/actuator/health']
+        labels: { env: dev, stack: spring, app: sample-spring, tier: deploy-node }
+      - targets: ['http://dev-react-01/healthz']
+        labels: { env: dev, stack: react, app: sample-react, tier: deploy-node }
+      - targets: ['http://dev-fastapi-01:8000/healthz']
+        labels: { env: dev, stack: fastapi, app: sample-fastapi, tier: deploy-node }
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # ── LDAP(SSO) 헬스 ──
+  - job_name: openldap
+    static_configs:
+      - targets: ['openldap-exporter:9330']
+
+  # ── Nginx(정문) ──
+  - job_name: nginx
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+
+  # ── 서비스별 메트릭 (추가 배선 후 주석 해제) ──
+  # - job_name: nexus
+  #   metrics_path: /service/metrics/prometheus
+  #   basic_auth:
+  #     username: '<user>'
+  #     password: '<pass>'
+  #   static_configs:
+  #     - targets: ['nexus:8081']
+  #
+  # - job_name: rundeck
+  #   metrics_path: /metrics/metrics        # Rundeck API 토큰 필요
+  #   static_configs:
+  #     - targets: ['rundeck:4440']

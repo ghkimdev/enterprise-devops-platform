@@ -1,0 +1,112 @@
+groups:
+  # ── CI/CD ──────────────────────────────────────────────────────────
+  - name: cicd
+    rules:
+      - alert: LastBuildFailed
+        expr: ci_build_result == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.app }} 최신 빌드 실패"
+          description: "app={{ $labels.app }} team={{ $labels.team }} 최신 빌드가 실패 상태."
+
+      - alert: LastDeployFailed
+        expr: ci_deploy_result == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.app }} 배포 실패 ({{ $labels.env }})"
+          description: "app={{ $labels.app }} team={{ $labels.team }} env={{ $labels.env }} 배포 실패."
+
+      # prod 배포 실패는 critical로 승격
+      - alert: ProdDeployFailed
+        expr: ci_deploy_result{env="prod"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "[PROD] {{ $labels.app }} 운영 배포 실패"
+          description: "app={{ $labels.app }} team={{ $labels.team }} 운영(prod) 배포 실패 — 즉시 확인 필요."
+
+  # ── 인프라 ─────────────────────────────────────────────────────────
+  - name: infra
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} 타깃 다운"
+          description: "{{ $labels.instance }} ({{ $labels.job }}) 2분 이상 응답 없음."
+
+      - alert: HostHighCpu
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "호스트 CPU 높음 ({{ $labels.instance }})"
+          description: "CPU 사용률 10분 평균 85% 초과 (현재 {{ printf \"%.1f\" $value }}%)."
+
+      - alert: HostHighMemory
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "호스트 메모리 높음 ({{ $labels.instance }})"
+          description: "메모리 사용률 90% 초과 (현재 {{ printf \"%.1f\" $value }}%)."
+
+      - alert: HostLowDisk
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes) * 100 < 15
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "디스크 여유 부족 ({{ $labels.instance }} {{ $labels.mountpoint }})"
+          description: "여유 공간 15% 미만 (현재 {{ printf \"%.1f\" $value }}%)."
+
+  # ── TLS / 엔드포인트 (blackbox) ─────────────────────────────────────
+  - name: tls
+    rules:
+      - alert: EndpointDown
+        expr: probe_success == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "엔드포인트 프로빙 실패 ({{ $labels.instance }})"
+          description: "{{ $labels.instance }} 5분 이상 정상 응답 없음."
+
+      - alert: CertExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS 인증서 만료 임박 ({{ $labels.instance }})"
+          description: "{{ $labels.instance }} 인증서가 약 {{ printf \"%.0f\" $value }}일 후 만료. certs.sh 재발급 필요."
+
+      - alert: CertExpiringCritical
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 7
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "[긴급] TLS 인증서 만료 D-7 미만 ({{ $labels.instance }})"
+          description: "{{ $labels.instance }} 인증서가 약 {{ printf \"%.0f\" $value }}일 후 만료."
+
+  # ── LDAP(SSO) ───────────────────────────────────────────────────────
+  - name: ldap
+    rules:
+      - alert: OpenLdapExporterDown
+        expr: up{job="openldap"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LDAP 익스포터 다운"
+          description: "openldap-exporter 스크랩 실패 — SSO 헬스 모니터링 중단."

@@ -9,7 +9,6 @@ set -euo pipefail
 DAYS=365
 KEY_SIZE=4096
 CA_PASS="${CA_PASS:-$(openssl rand -base64 24)}"
-umask 077
 printf '%s' "$CA_PASS" > nginx/certs/ca.pass
 
 COUNTRY="KR"
@@ -33,14 +32,14 @@ echo ""
 # ============================================
 # 1. 디렉토리 구조 생성
 # ============================================
-echo -e "${YELLOW}[1/12] 디렉토리 구조 생성...${NC}"
+echo -e "${YELLOW}[1/11] 디렉토리 구조 생성...${NC}"
 rm -rf nginx/certs
 rm -rf ldap/certs
 rm -rf jenkins/certs
 rm -rf rundeck/certs
 rm -rf nexus/certs
 rm -rf svn/certs
-mkdir -p nginx/certs/{ldap,jenkins,rundeck,nexus,svn}
+mkdir -p nginx/certs/{ldap,jenkins,rundeck,nexus,svn,grafana}
 mkdir -p ldap/certs
 mkdir -p jenkins/certs
 mkdir -p rundeck/certs
@@ -50,17 +49,18 @@ echo -e "${GREEN}✓ 디렉토리 생성 완료${NC}"
 echo ""
 
 cd nginx/certs
+printf '%s' "$CA_PASS" > ca.pass
 
 # ============================================
 # 2. CA (인증 기관) 생성
 # ============================================
-echo -e "${YELLOW}[2/12] CA 개인키 생성...${NC}"
-openssl genrsa -aes256 -out ca.key -passout env:${CA_PASS} ${KEY_SIZE}
+echo -e "${YELLOW}[2/11] CA 개인키 생성...${NC}"
+openssl genrsa -aes256 -out ca.key -passout pass:${CA_PASS} ${KEY_SIZE}
 echo -e "${GREEN}✓ CA 개인키 생성 완료${NC}"
 echo ""
 
-echo -e "${YELLOW}[3/12] CA 자체 서명 인증서 생성...${NC}"
-openssl req -new -x509 -days ${DAYS} -key ca.key -passin env:${CA_PASS} \
+echo -e "${YELLOW}[3/11] CA 자체 서명 인증서 생성...${NC}"
+openssl req -new -x509 -days ${DAYS} -key ca.key -passin pass:${CA_PASS} \
   -out ca.crt \
   -subj "/C=${COUNTRY}/ST=${STATE}/L=${CITY}/O=${ORG}/OU=${OU}/CN=${ORG}-CA"
 echo -e "${GREEN}✓ CA 인증서 생성 완료${NC}"
@@ -116,7 +116,7 @@ EOF
   openssl x509 -req -days ${DAYS} \
     -in ${DIR}/${NAME}.csr \
     -CA ca.crt \
-    -CAkey ca.key -passin env:${CA_PASS} \
+    -CAkey ca.key -passin pass:${CA_PASS} \
     -CAcreateserial \
     -out ${DIR}/${NAME}.crt \
     -extensions req_ext \
@@ -129,7 +129,7 @@ EOF
 # ============================================
 # 3. LDAP 인증서 생성
 # ============================================
-echo -e "${YELLOW}[4/10] LDAP 인증서 생성...${NC}"
+echo -e "${YELLOW}[4/11] LDAP 인증서 생성...${NC}"
 create_cert_with_san "ldap" "ldap"
 echo -e "${GREEN}✓ LDAP 인증서 생성 완료${NC}"
 echo ""
@@ -137,7 +137,7 @@ echo ""
 # ============================================
 # 4. Jenkins 인증서 생성
 # ============================================
-echo -e "${YELLOW}[5/10] Jenkins 인증서 생성...${NC}"
+echo -e "${YELLOW}[5/11] Jenkins 인증서 생성...${NC}"
 create_cert_with_san "jenkins" "jenkins"
 echo -e "${GREEN}✓ Jenkins 인증서 생성 완료${NC}"
 echo ""
@@ -145,7 +145,7 @@ echo ""
 # ============================================
 # 5. Rundeck 인증서 생성
 # ============================================
-echo -e "${YELLOW}[6/10] Rundeck 인증서 생성...${NC}"
+echo -e "${YELLOW}[6/11] Rundeck 인증서 생성...${NC}"
 create_cert_with_san "rundeck" "rundeck"
 echo -e "${GREEN}✓ Rundeck 인증서 생성 완료${NC}"
 echo ""
@@ -167,9 +167,17 @@ echo -e "${GREEN}✓ SVN 인증서 생성 완료${NC}"
 echo ""
 
 # ============================================
-# 8. CA 인증서 배치
+# 8. Grafana 인증서 생성
 # ============================================
-echo -e "${YELLOW}[9/10] CA 인증서 배치...${NC}"
+echo -e "${YELLOW}[9/11] Grafana 인증서 생성...${NC}"
+create_cert_with_san "grafana" "grafana"
+echo -e "${GREEN}✓ Grafana 인증서 생성 완료${NC}"
+echo ""
+
+# ============================================
+# 9. CA 인증서 배치
+# ============================================
+echo -e "${YELLOW}[10/11] CA 인증서 배치...${NC}"
 cp ca.crt ../../ldap/certs
 cp ldap/ldap.crt ../../ldap/certs
 cp ldap/ldap.key ../../ldap/certs
@@ -183,7 +191,7 @@ echo ""
 # ============================================
 # 9. 파일 권한 설정
 # ============================================
-echo -e "${YELLOW}[10/10] 파일 권한 설정...${NC}"
+echo -e "${YELLOW}[11/11] 파일 권한 설정...${NC}"
 find . -name "*.key" -exec chmod 600 {} \;
 find . -name "*.crt" -exec chmod 644 {} \;
 echo -e "${GREEN}✓ 파일 권한 설정 완료${NC}"
@@ -223,5 +231,9 @@ echo ""
 echo "SVN:"
 echo "  • nginx/certs/svn/svn.crt"
 echo "  • nginx/certs/svn/svn.key"
+echo ""
+echo "Grafana:"
+echo "  • nginx/certs/grafana/grafana.crt"
+echo "  • nginx/certs/grafana/grafana.key"
 echo ""
 echo -e "${BLUE}========================================${NC}"

@@ -3,6 +3,7 @@
 buildPipeline([
     stack          : 'fastapi',
     appName        : 'sample-fastapi',
+    team           : 'ml-team',
     agentImage     : 'jenkins-agent-python:1.0.0',
 
     svnTrunk       : 'http://svn/svn/sample-fastapi/trunk',
