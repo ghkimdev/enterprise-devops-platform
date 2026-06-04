@@ -1,0 +1,7 @@
+unclassified:
+  prometheusConfiguration:
+    path: "prometheus"                 # 엔드포인트: /prometheus/
+    defaultNamespace: "default"
+    useAuthenticatedEndpoint: false    # 내부망 스크랩용 — 인증 없이 노출
+    collectingMetricsPeriodInSeconds: 120
+ 

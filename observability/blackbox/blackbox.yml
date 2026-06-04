@@ -20,3 +20,8 @@ modules:
       method: GET
       valid_status_codes: [200]      # Spring actuator는 DOWN 시 503 → 자동 감지
       preferred_ip_protocol: ip4
+
+  # TCP 포트 도달성 (LDAP 등 비-HTTP 서비스)
+  tcp_connect:
+    prober: tcp
+    timeout: 5s

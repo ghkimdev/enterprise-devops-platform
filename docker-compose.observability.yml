@@ -121,8 +121,8 @@ services:
     environment:
       GF_SERVER_ROOT_URL: "https://grafana.example.com"
       GF_SERVER_ENFORCE_DOMAIN: "false"
-      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
-      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD}"
+      GF_SECURITY_ADMIN_USER: "${LDAP_ADMIN_USER}"
+      GF_SECURITY_ADMIN_PASSWORD: "${LDAP_BIND_PASSWORD}"
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_AUTH_LDAP_ENABLED: "true"
       GF_AUTH_LDAP_CONFIG_FILE: "/etc/grafana/ldap.toml"
@@ -222,23 +222,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-
-  # ── LDAP(SSO) 헬스 ──────────────────────────────────────────────────
-  # 전제: slapd의 cn=Monitor 백엔드가 활성화돼 있어야 메트릭이 나온다.
-  # 미설정 시 blackbox가 기본 도달성(up/down)을 커버.
-  # 비밀번호는 환경변수(LDAP_PASS)로 주입 — 커맨드라인 노출 회피.
-  openldap-exporter:
-    image: tomcz/openldap_exporter:v2.2.0   # 미러 다수 존재 — 배포 전 이미지/태그 확인
-    container_name: openldap-exporter
-    restart: unless-stopped
-    environment:
-      LDAP_ADDR: "ldap:389"
-      LDAP_USER: "cn=admin,dc=example,dc=com"
-      LDAP_PASS: "${LDAP_BIND_PASSWORD}"
-      PROM_ADDR: ":9330"
-      INTERVAL: "30s"
-    networks:
-      - cicd-net
 
   # ── Nginx(정문) 트래픽 ──────────────────────────────────────────────
   # 전제: nginx/conf.d/status.conf (stub_status, 내부 8088) 가 로드돼 있어야 함.

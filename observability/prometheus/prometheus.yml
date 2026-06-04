@@ -94,10 +94,21 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # ── LDAP(SSO) 헬스 ──
-  - job_name: openldap
+  # ── LDAP(SSO) 헬스 — blackbox TCP 프로브로 포트 도달성 확인 ──
+  - job_name: blackbox-tcp
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
     static_configs:
-      - targets: ['openldap-exporter:9330']
+      - targets: ['ldap:389']
+        labels: { service: ldap }
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
 
   # ── Nginx(정문) ──
   - job_name: nginx

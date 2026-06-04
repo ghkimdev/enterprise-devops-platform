@@ -14,8 +14,10 @@
 //     durationSec: <초>, infoFile: 'build-info.json'
 //   ])
 
-def PUSHGATEWAY = 'http://pushgateway:9091'
-def LOKI        = 'http://loki:3100'
+import groovy.transform.Field
+
+@Field String PUSHGATEWAY = 'http://pushgateway:9091'
+@Field String LOKI        = 'http://loki:3100'
 
 /** 최신 상태 게이지 → Pushgateway. 그룹 키(app/team[/env])는 고정이라 매 실행 덮어쓴다. */
 def pushState(Map m) {

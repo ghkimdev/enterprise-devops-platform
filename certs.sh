@@ -9,7 +9,6 @@ set -euo pipefail
 DAYS=365
 KEY_SIZE=4096
 CA_PASS="${CA_PASS:-$(openssl rand -base64 24)}"
-printf '%s' "$CA_PASS" > nginx/certs/ca.pass
 
 COUNTRY="KR"
 STATE="Seoul"

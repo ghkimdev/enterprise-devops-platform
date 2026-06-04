@@ -102,11 +102,11 @@ groups:
   # ── LDAP(SSO) ───────────────────────────────────────────────────────
   - name: ldap
     rules:
-      - alert: OpenLdapExporterDown
-        expr: up{job="openldap"} == 0
-        for: 5m
+      - alert: LdapUnreachable
+        expr: probe_success{job="blackbox-tcp", service="ldap"} == 0
+        for: 3m
         labels:
-          severity: warning
+          severity: critical
         annotations:
-          summary: "LDAP 익스포터 다운"
-          description: "openldap-exporter 스크랩 실패 — SSO 헬스 모니터링 중단."
+          summary: "LDAP(SSO) 도달 불가"
+          description: "ldap:389 TCP 프로브 3분 이상 실패 — 전 서비스 인증에 영향."

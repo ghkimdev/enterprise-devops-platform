@@ -207,18 +207,6 @@ CHECKITEM #     : ${env.BUILD_NUMBER}
 =================================================="""
             }
             always {
-                script {
-                    metricsHelper.record([
-                        kind       : 'checkitem',
-                        app        : config.appName,
-                        team       : config.team,
-                        env        : params.TARGET_ENV,
-                        result     : currentBuild.currentResult,
-                        durationSec: ((currentBuild.duration ?:
-                                      (System.currentTimeMillis() - currentBuild.startTimeInMillis)).intdiv(1000)),
-                        infoFile   : 'checkitem-info.json'
-                    ])
-                }
                 cleanWs()
             }
         }

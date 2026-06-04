@@ -260,9 +260,6 @@ DOCKER          : ${config.dockerImage}:${env.RELEASE_NAME}
                 sh "docker logout ${config.dockerRegistry}"
                 cleanWs()
             }
-                sh "docker logout ${config.dockerRegistry}"
-                cleanWs()
-            }
         }
     }
 }
