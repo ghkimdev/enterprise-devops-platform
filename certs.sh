@@ -1,18 +1,16 @@
 #!/bin/bash
 # LDAPS + 모든 애플리케이션에 SSL/TLS 인증서 빠르게 적용하기
 
-set -e
+set -euo pipefail 
 
 # ============================================
 # 설정
 # ============================================
 DAYS=365
 KEY_SIZE=4096
-CA_PASS="ca-password123"
-JENKINS_PASS="jenkins123"
-RUNDECK_PASS="rundeck123"
-NEXUS_PASS="nexus123"
-TRUSTSTORE_PASS="trustpass123"
+CA_PASS="${CA_PASS:-$(openssl rand -base64 24)}"
+umask 077
+printf '%s' "$CA_PASS" > nginx/certs/ca.pass
 
 COUNTRY="KR"
 STATE="Seoul"
@@ -57,12 +55,12 @@ cd nginx/certs
 # 2. CA (인증 기관) 생성
 # ============================================
 echo -e "${YELLOW}[2/12] CA 개인키 생성...${NC}"
-openssl genrsa -aes256 -out ca.key -passout pass:${CA_PASS} ${KEY_SIZE}
+openssl genrsa -aes256 -out ca.key -passout env:${CA_PASS} ${KEY_SIZE}
 echo -e "${GREEN}✓ CA 개인키 생성 완료${NC}"
 echo ""
 
 echo -e "${YELLOW}[3/12] CA 자체 서명 인증서 생성...${NC}"
-openssl req -new -x509 -days ${DAYS} -key ca.key -passin pass:${CA_PASS} \
+openssl req -new -x509 -days ${DAYS} -key ca.key -passin env:${CA_PASS} \
   -out ca.crt \
   -subj "/C=${COUNTRY}/ST=${STATE}/L=${CITY}/O=${ORG}/OU=${OU}/CN=${ORG}-CA"
 echo -e "${GREEN}✓ CA 인증서 생성 완료${NC}"
@@ -118,7 +116,7 @@ EOF
   openssl x509 -req -days ${DAYS} \
     -in ${DIR}/${NAME}.csr \
     -CA ca.crt \
-    -CAkey ca.key -passin pass:${CA_PASS} \
+    -CAkey ca.key -passin env:${CA_PASS} \
     -CAcreateserial \
     -out ${DIR}/${NAME}.crt \
     -extensions req_ext \
@@ -188,8 +186,6 @@ echo ""
 echo -e "${YELLOW}[10/10] 파일 권한 설정...${NC}"
 find . -name "*.key" -exec chmod 600 {} \;
 find . -name "*.crt" -exec chmod 644 {} \;
-find . -name "*.p12" -exec chmod 600 {} \;
-find . -name "*.jks" -exec chmod 600 {} \;
 echo -e "${GREEN}✓ 파일 권한 설정 완료${NC}"
 echo ""
 
@@ -213,32 +209,19 @@ echo "  • nginx/certs/ldap/ldap.crt"
 echo "  • nginx/certs/ldap/ldap.key"
 echo ""
 echo "Jenkins:"
-echo "  • nginx/certs/jenkins/jenkins-keystore.p12"
-echo "  • nginx/certs/jenkins/ldap-truststore.jks"
+echo "  • nginx/certs/jenkins/jenkins.crt"
+echo "  • nginx/certs/jenkins/jenkins.key"
 echo ""
 echo "Rundeck:"
-echo "  • nginx/certs/rundeck/rundeck-keystore.p12"
+echo "  • nginx/certs/rundeck/rundeck.crt"
+echo "  • nginx/certs/rundeck/rundeck.key"
 echo ""
 echo "Nexus:"
-echo "  • nginx/certs/nexus/nexus-keystore.p12"
-echo "  • nginx/certs/nexus/ldap-truststore.jks"
+echo "  • nginx/certs/nexus/nexus.crt"
+echo "  • nginx/certs/nexus/nexus.key"
 echo ""
 echo "SVN:"
 echo "  • nginx/certs/svn/svn.crt"
 echo "  • nginx/certs/svn/svn.key"
-echo ""
-echo -e "${YELLOW}패스워드:${NC}"
-echo "  • CA 개인키: ${CA_PASS}"
-echo "  • Jenkins 키스토어: ${JENKINS_PASS}"
-echo "  • Rundeck 키스토어: ${RUNDECK_PASS}"
-echo "  • Nexus 키스토어: ${NEXUS_PASS}"
-echo "  • 신뢰저장소(JKS): ${TRUSTSTORE_PASS}"
-echo ""
-echo -e "${YELLOW}다음 단계:${NC}"
-echo "1. docker-compose.yml 파일 확인"
-echo "2. docker compose -f docker-compose.yml up -d"
-echo "3. LDAPS 연결 테스트:"
-echo "   docker exec ldap ldapwhoami -H ldaps://localhost:636 \\"
-echo "     -D 'cn=admin,dc=example,dc=com' -w AdminPass123"
 echo ""
 echo -e "${BLUE}========================================${NC}"
