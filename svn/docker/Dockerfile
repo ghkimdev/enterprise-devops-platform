@@ -3,6 +3,7 @@ FROM debian:bookworm-20260505-slim
 COPY certs/ca.crt /usr/local/share/ca-certificates/self-ca.crt
 
 RUN apt-get update && apt-get install -y \
+    curl \
     gettext-base \
     apache2 \
     subversion \

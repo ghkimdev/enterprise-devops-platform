@@ -123,6 +123,6 @@ done
 SHARED="cicd-shared-library"
 SHARED_PATH="${REPOS_ROOT}/${SHARED}"
 create_repo  "${SHARED}" "${SHARED_PATH}"
-install_hooks "${SHARED_PATH}" start-commit pre-commit post-commit
+install_hooks "${SHARED_PATH}" pre-commit post-commit
 
 log "SVN bootstrap 완료"

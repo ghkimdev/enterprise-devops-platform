@@ -11,15 +11,16 @@
 #   $1 = REPOS  (저장소 경로)
 #   $2 = TXN    (검증 대상 트랜잭션 이름; 아직 리비전이 아님)
 #
-# 설치:
-#   <repo>/hooks/pre-commit 로 복사 후 chmod +x
+# 로그 설계:
+#   각 검사를 함수로 쪼개고 run_stage 로 감싸 START/OK 를 자동 기록한다.
+#   실패 시 fail() 이 "현재 단계명"과 함께 FAILED 를 남기므로,
+#   로그에서 마지막 START(혹은 FAILED) 가 곧 실패 지점이 된다.
+#   동시 커밋 구분을 위해 실행마다 RUN_ID(PID)를 붙인다.
 #
 # 설계 메모:
-#   - SVN 훅은 "빈 환경(empty environment)"에서 실행된다. PATH/LOCALE가 없을 수 있어
-#     상단에서 명시적으로 설정한다. (이걸 빠뜨리면 svnlook을 못 찾아 조용히 깨진다.)
-#   - 검증은 트랜잭션을 대상으로 하므로 `svnlook ... -t "$TXN"` 을 사용한다.
-#   - 모든 거부 메시지는 stderr(>&2)로 보내야 사용자에게 노출된다.
-#   - set -e 는 쓰지 않는다. 각 검사 실패를 직접 처리하고 우리가 만든 메시지를 보여주기 위함.
+#   - SVN 훅은 "빈 환경"에서 실행된다. PATH/LOCALE를 상단에서 명시한다.
+#   - 검사 함수는 위반 시 fail()로 '명시적 exit', 정상이면 'return 0' 으로 끝낸다.
+#     (set -u/pipefail 하에서 중간 명령의 반환값이 단계 결과로 새지 않도록)
 
 set -uo pipefail
 
@@ -34,25 +35,33 @@ REPOS="$1"
 TXN="$2"
 
 # ───────────────────────── 로그 ─────────────────────────
-# 훅은 apache(www-data)가 commit을 처리할 때 실행되므로, 이 디렉토리는
-# www-data가 쓸 수 있어야 한다 (init-svn.sh에서 미리 생성/소유권 부여).
-# 로그를 못 써도 훅 자체가 깨지면 안 되므로 모든 실패를 무시한다.
 HOOK_LOG_DIR="${HOOK_LOG_DIR:-/var/log/svn-hooks}"
 HOOK_NAME="$(basename "$0")"
+RUN_ID="$$"                 # 동시 커밋 구분용 상관 ID (프로세스 PID)
+CURRENT_STAGE="-"           # 현재 단계명 (fail 시 함께 기록)
 
 log_hook() {
-    printf '%s [%s] [%s] %s\n' \
+    printf '%s [%s] [%s] [#%s] %s\n' \
         "$(date '+%Y-%m-%d %H:%M:%S')" \
         "$HOOK_NAME" \
         "$(basename "$REPOS")" \
+        "$RUN_ID" \
         "$*" >> "${HOOK_LOG_DIR}/${HOOK_NAME}.log" 2>/dev/null || true
 }
 
+# 단계 실행 래퍼: START 찍고 → 함수 실행 → OK 찍는다.
+# 검사 함수가 위반을 만나면 내부에서 fail() 이 exit 하므로 OK 줄에 도달하지 않는다.
+run_stage() {
+    CURRENT_STAGE="$1"; shift
+    log_hook "START: ${CURRENT_STAGE}"
+    "$@"
+    log_hook "OK: ${CURRENT_STAGE}"
+}
+
 # ───────────────────────── 정책 토글 ─────────────────────────
-# 저장소 성격에 따라 켜고 끌 수 있도록 상단에 모았다 (config-driven).
 ENABLE_MSG_CHECK=1          # 커밋 메시지 검증
 MIN_MSG_LEN=10              # 메시지 최소 길이(문자)
-ENABLE_CONVENTIONAL=1       # feat:/fix:/chore: 형식 강제 (git 컨벤션과 통일)
+ENABLE_CONVENTIONAL=1       # feat:/fix:/chore: 형식 강제
 ENABLE_TAG_IMMUTABILITY=1   # tags/ 불변성 (핵심)
 TAGS_PATH="tags"            # 태그 루트 경로명
 ENABLE_SECRET_SCAN=1        # 비밀키/자격증명 차단
@@ -60,37 +69,41 @@ ENABLE_ARTIFACT_BLOCK=1     # 빌드 산출물/대용량 바이너리 차단
 ENABLE_SIZE_LIMIT=1         # 파일 크기 제한
 MAX_FILE_MB=10              # 단일 파일 최대 크기(MB)
 
-# 컨벤셔널 커밋 허용 타입
 CONVENTIONAL_TYPES='feat|fix|chore|docs|refactor|test|build|ci|perf|revert|style'
 
-# 검증 면제 계정 (빌드/릴리스 자동화).
-# 파이프라인의 태그 생성(trunk→tags copy) 등 정당한 자동화 작업은
-# 사람용 정책 검증을 면제한다. 비워두면 면제 없음.
+# 검증 면제 계정 (빌드/릴리스 자동화). 비워두면 면제 없음.
 BYPASS_USERS=" build ci-bot release-bot "
 
 # ───────────────────────── 헬퍼 ─────────────────────────
 err()  { echo "[pre-commit] $*" >&2; }
-fail() { log_hook "REJECT: $*"; err "거부됨: $*"; exit 1; }
+fail() { log_hook "FAILED [${CURRENT_STAGE}]: $*"; err "거부됨: $*"; exit 1; }
 
 # ───────────────────────── 트랜잭션 정보 수집 ─────────────────────────
 AUTHOR="$("$SVNLOOK" author  -t "$TXN" "$REPOS" 2>/dev/null)"
 LOGMSG="$("$SVNLOOK" log     -t "$TXN" "$REPOS" 2>/dev/null)"
 CHANGED="$("$SVNLOOK" changed -t "$TXN" "$REPOS" 2>/dev/null)"
 
-# ───────────────────────── 면제 계정 처리 ─────────────────────────
-# 신뢰된 자동화 계정의 커밋은 모든 검증을 건너뛰고 즉시 통과한다.
-# (안 그러면 훅이 파이프라인 자신의 태그 생성을 막아버린다.)
-case "$BYPASS_USERS" in
-    *" ${AUTHOR} "*)
-        log_hook "BYPASS: author=${AUTHOR} (신뢰된 자동화 계정)"
-        exit 0
-        ;;
-esac
+# ============================================================
+# 단계 함수들
+# ============================================================
 
-# ============================================================
+# 0) 면제 계정 — 신뢰된 자동화는 모든 검증 건너뛰고 즉시 통과
+check_bypass() {
+    case "$BYPASS_USERS" in
+        *" ${AUTHOR} "*)
+            log_hook "BYPASS: author=${AUTHOR} (신뢰된 자동화 계정)"
+            log_hook "PASS (bypass)"
+            exit 0
+            ;;
+    esac
+    return 0
+}
+
 # 1) 커밋 메시지 검증
-# ============================================================
-if [ "$ENABLE_MSG_CHECK" -eq 1 ]; then
+check_message() {
+    [ "$ENABLE_MSG_CHECK" -eq 1 ] || return 0
+
+    local trimmed msg_len first_line
     trimmed="$(printf '%s' "$LOGMSG" | tr -d '[:space:]')"
     if [ -z "$trimmed" ]; then
         fail "커밋 메시지가 비어 있습니다. 변경 사유를 적어주세요."
@@ -105,21 +118,21 @@ if [ "$ENABLE_MSG_CHECK" -eq 1 ]; then
         first_line="$(printf '%s\n' "$LOGMSG" | head -n1)"
         if ! printf '%s' "$first_line" \
             | grep -qE "^(${CONVENTIONAL_TYPES})(\([a-zA-Z0-9_./-]+\))?: .+"; then
-            log_hook "REJECT: 메시지 형식 위반 → ${first_line}"
-            err "거부됨: 커밋 메시지 형식이 올바르지 않습니다."
             err "  형식 : <type>(<scope>): <설명>"
             err "  타입 : ${CONVENTIONAL_TYPES//|/, }"
             err "  예시 : feat(deploy): Rundeck 배포 잡 분기 추가"
             err "  현재 : ${first_line}"
-            exit 1
+            fail "커밋 메시지 형식이 올바르지 않습니다."
         fi
     fi
-fi
+    return 0
+}
 
-# ============================================================
-# 2) 태그 불변성 (immutable tags) — 이 프로젝트의 핵심 정책
-# ============================================================
-if [ "$ENABLE_TAG_IMMUTABILITY" -eq 1 ]; then
+# 2) 태그 불변성
+check_tag_immutability() {
+    [ "$ENABLE_TAG_IMMUTABILITY" -eq 1 ] || return 0
+
+    local line status path action rest tagname
     # 1차 패스: 이번에 새로 생성되는 태그 루트 수집
     NEW_TAGS=" "
     while IFS= read -r line; do
@@ -138,7 +151,7 @@ if [ "$ENABLE_TAG_IMMUTABILITY" -eq 1 ]; then
         esac
     done <<< "$CHANGED"
 
-    # 2차 패스: tags/ 하위 변경을 검사
+    # 2차 패스: tags/ 하위 변경 검사
     while IFS= read -r line; do
         [ -z "$line" ] && continue
         path="$(printf '%s' "$line" | cut -c5-)"
@@ -149,76 +162,86 @@ if [ "$ENABLE_TAG_IMMUTABILITY" -eq 1 ]; then
                 case "$NEW_TAGS" in
                     *" ${tagname} "*) : ;;
                     *)
-                        log_hook "REJECT: 기존 태그 변경 시도 → ${path}"
-                        err "거부됨: 태그는 불변(immutable)입니다."
                         err "  기존 태그를 수정/삭제/추가할 수 없습니다: ${path}"
                         err "  태그는 파이프라인이 trunk에서 복사해 1회만 생성합니다."
                         err "  변경이 필요하면 새 리비전으로 빌드해 새 태그를 만드세요."
-                        exit 1
+                        fail "태그는 불변(immutable)입니다: ${path}"
                         ;;
                 esac
                 ;;
         esac
     done <<< "$CHANGED"
-fi
+    return 0
+}
 
-# ============================================================
 # 3) 변경 파일 단위 검사 (비밀정보 / 산출물 / 크기)
-# ============================================================
-while IFS= read -r line; do
-    [ -z "$line" ] && continue
-    status="$(printf '%s' "$line" | cut -c1-3)"
-    path="$(printf '%s' "$line" | cut -c5-)"
-    action="${status:0:1}"
+check_files() {
+    local line status path action is_dir base fsize max_bytes mb
 
-    [ "$action" = "D" ] && continue
-    case "$path" in */) is_dir=1 ;; *) is_dir=0 ;; esac
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        status="$(printf '%s' "$line" | cut -c1-3)"
+        path="$(printf '%s' "$line" | cut -c5-)"
+        action="${status:0:1}"
 
-    base="${path##*/}"
+        [ "$action" = "D" ] && continue
+        case "$path" in */) is_dir=1 ;; *) is_dir=0 ;; esac
+        base="${path##*/}"
 
-    # ---- 3-1) 비밀키 / 자격증명 차단 ----
-    if [ "$ENABLE_SECRET_SCAN" -eq 1 ] && [ "$is_dir" -eq 0 ]; then
-        case "$base" in
-            id_rsa|id_dsa|id_ecdsa|id_ed25519|*.pem|*.key|*.pfx|*.p12|*.keystore|.env|.env.*|*.ppk)
-                fail "비밀정보로 의심되는 파일은 커밋할 수 없습니다: ${path}"
-                ;;
-        esac
-        fsize="$("$SVNLOOK" filesize -t "$TXN" "$REPOS" "$path" 2>/dev/null || echo 0)"
-        if [ "${fsize:-0}" -lt 1048576 ]; then
-            if "$SVNLOOK" cat -t "$TXN" "$REPOS" "$path" 2>/dev/null \
-                | grep -qE 'BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY'; then
-                fail "개인키(PRIVATE KEY)가 포함되어 커밋할 수 없습니다: ${path}"
+        # 3-1) 비밀키 / 자격증명 차단
+        if [ "$ENABLE_SECRET_SCAN" -eq 1 ] && [ "$is_dir" -eq 0 ]; then
+            case "$base" in
+                id_rsa|id_dsa|id_ecdsa|id_ed25519|*.pem|*.key|*.pfx|*.p12|*.keystore|.env|.env.*|*.ppk)
+                    fail "비밀정보로 의심되는 파일은 커밋할 수 없습니다: ${path}"
+                    ;;
+            esac
+            fsize="$("$SVNLOOK" filesize -t "$TXN" "$REPOS" "$path" 2>/dev/null || echo 0)"
+            if [ "${fsize:-0}" -lt 1048576 ]; then
+                if "$SVNLOOK" cat -t "$TXN" "$REPOS" "$path" 2>/dev/null \
+                    | grep -qE 'BEGIN (RSA |OPENSSH |EC |DSA )?PRIVATE KEY'; then
+                    fail "개인키(PRIVATE KEY)가 포함되어 커밋할 수 없습니다: ${path}"
+                fi
             fi
         fi
-    fi
 
-    # ---- 3-2) 빌드 산출물 / 의존성 디렉토리 차단 ----
-    if [ "$ENABLE_ARTIFACT_BLOCK" -eq 1 ]; then
-        case "$path" in
-            *.class|*.jar|*.war|*.ear|*.pyc|*.o|*.so|*.a|*.dll|*.exe)
-                fail "빌드 산출물은 커밋할 수 없습니다 (Nexus로 관리): ${path}" ;;
-            */node_modules/*|node_modules/*|\
-            */__pycache__/*|__pycache__/*|\
-            */target/*|target/*|\
-            */dist/*|dist/*|\
-            */build/*|build/*|\
-            */.venv/*|.venv/*)
-                fail "의존성/빌드 디렉토리는 커밋 대상이 아닙니다: ${path}" ;;
-        esac
-    fi
-
-    # ---- 3-3) 파일 크기 제한 ----
-    if [ "$ENABLE_SIZE_LIMIT" -eq 1 ] && [ "$is_dir" -eq 0 ]; then
-        fsize="$("$SVNLOOK" filesize -t "$TXN" "$REPOS" "$path" 2>/dev/null || echo 0)"
-        max_bytes=$(( MAX_FILE_MB * 1024 * 1024 ))
-        if [ "${fsize:-0}" -gt "$max_bytes" ]; then
-            mb=$(( fsize / 1024 / 1024 ))
-            fail "파일이 너무 큽니다 (${mb}MB > ${MAX_FILE_MB}MB): ${path}"
+        # 3-2) 빌드 산출물 / 의존성 디렉토리 차단
+        if [ "$ENABLE_ARTIFACT_BLOCK" -eq 1 ]; then
+            case "$path" in
+                *.class|*.jar|*.war|*.ear|*.pyc|*.o|*.so|*.a|*.dll|*.exe)
+                    fail "빌드 산출물은 커밋할 수 없습니다 (Nexus로 관리): ${path}" ;;
+                */node_modules/*|node_modules/*|\
+                */__pycache__/*|__pycache__/*|\
+                */target/*|target/*|\
+                */dist/*|dist/*|\
+                */build/*|build/*|\
+                */.venv/*|.venv/*)
+                    fail "의존성/빌드 디렉토리는 커밋 대상이 아닙니다: ${path}" ;;
+            esac
         fi
-    fi
 
-done <<< "$CHANGED"
+        # 3-3) 파일 크기 제한
+        if [ "$ENABLE_SIZE_LIMIT" -eq 1 ] && [ "$is_dir" -eq 0 ]; then
+            fsize="$("$SVNLOOK" filesize -t "$TXN" "$REPOS" "$path" 2>/dev/null || echo 0)"
+            max_bytes=$(( MAX_FILE_MB * 1024 * 1024 ))
+            if [ "${fsize:-0}" -gt "$max_bytes" ]; then
+                mb=$(( fsize / 1024 / 1024 ))
+                fail "파일이 너무 큽니다 (${mb}MB > ${MAX_FILE_MB}MB): ${path}"
+            fi
+        fi
+    done <<< "$CHANGED"
+    return 0
+}
 
-# 모든 검사 통과
-log_hook "OK: author=${AUTHOR} msg=\"$(printf '%s' "$LOGMSG" | head -n1)\""
+# ============================================================
+# 실행
+# ============================================================
+log_hook "BEGIN: txn=${TXN} author=${AUTHOR}"
+
+check_bypass    # 면제면 여기서 exit 0
+
+run_stage "message-check"     check_message
+run_stage "tag-immutability"  check_tag_immutability
+run_stage "file-checks"       check_files
+
+log_hook "PASS (all checks): author=${AUTHOR} msg=\"$(printf '%s' "$LOGMSG" | head -n1)\""
 exit 0
