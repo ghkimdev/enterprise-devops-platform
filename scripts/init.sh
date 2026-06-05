@@ -18,20 +18,21 @@ ok()   { echo -e "${GREEN}  ✓ $1${NC}"; }
 skip() { echo -e "  - $1 (이미 있음 — 스킵)"; }
 
 # 프로젝트 루트(스크립트 위치) 기준으로 동작
-cd "$(dirname "$0")"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-CA_CRT="nginx/certs/ca.crt"
+CA_CRT="${PROJECT_ROOT}/certs/ca/ca.crt"
+
 REGISTRY="nexus.example.com:5000"
 DOMAINS=(jenkins.example.com nexus.example.com rundeck.example.com svn.example.com grafana.example.com)
-HOSTS_MARKER="# legacy-cicd-pipeline"
-KEY_DIR="rundeck/keys/project/sample"
+HOSTS_MARKER="# enterprise-devops-platform"
+KEY_DIR="${PROJECT_ROOT}/cicd/rundeck/keys/project/sample"
 
 # ── 1) .env 생성 ────────────────────────────────────────────────────
 step 1 ".env 생성"
 if [ -f .env ]; then
     skip ".env"
 else
-    cp .env.example .env
+    cp ${PROJECT_ROOT}/.env.example ${PROJECT_ROOT}/.env
     ok ".env 생성 — ${RED}비밀번호 값(<change-me>)을 반드시 수정하세요${NC}"
 fi
 
@@ -40,7 +41,7 @@ step 2 "TLS 인증서 생성 (certs.sh)"
 if [ -f "${CA_CRT}" ]; then
     skip "인증서"
 else
-    ./certs.sh
+    ${PROJECT_ROOT}/scripts/certs.sh
     ok "인증서 생성 (CA: ${CA_CRT})"
 fi
 
@@ -70,7 +71,7 @@ fi
 
 # ── 5) 시스템 CA 신뢰 (호스트 curl 등이 사설 CA 신뢰) ───────────────
 step 5 "시스템 CA 신뢰 등록"
-sudo cp "${CA_CRT}" /usr/local/share/ca-certificates/legacy-cicd-ca.crt
+sudo cp "${CA_CRT}" /usr/local/share/ca-certificates/enterprise-devops-platform.crt
 sudo update-ca-certificates >/dev/null
 ok "update-ca-certificates 완료"
 

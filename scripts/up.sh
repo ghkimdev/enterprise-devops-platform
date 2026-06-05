@@ -11,12 +11,20 @@
 #   ./up.sh core     # core만 (메모리 절약)
 
 set -euo pipefail
-cd "$(dirname "$0")"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+COMPOSE_DIR="${PROJECT_ROOT}/compose"
+ENV_FILE="${PROJECT_ROOT}/.env"
 
 # core만 기동
 if [ "${1:-}" = "core" ]; then
     echo "core만 기동..."
-    docker compose up -d
+    docker compose \
+      --env-file "${ENV_FILE}" \
+      -f ${COMPOSE_DIR}/cicd.yml \
+      up -d
     echo -e "\n완료. (cicd-net 생성)"
     docker network ls | grep cicd-net && echo "cicd-net OK"
     exit 0
@@ -24,21 +32,37 @@ fi
 
 # 존재하는 보조 레이어 자동 수집
 EXTRA=()
-for f in docker-compose.observability.yml docker-compose.nodes.yml docker-compose.agents.yml; do
+for f in \
+  "${COMPOSE_DIR}/observability.yml" \
+  "${COMPOSE_DIR}/nodes.yml" \
+  "${COMPOSE_DIR}/agents.yml"
+do
     [ -f "$f" ] && EXTRA+=(-f "$f")
 done
 
 # 1) core 먼저 — cicd-net 생성
 echo "[1/2] core 기동 — cicd-net 생성..."
-docker compose up -d
+docker compose \
+  --env-file "${ENV_FILE}" \
+  -f ${COMPOSE_DIR}/cicd.yml \
+  up -d
 
 # 2) 보조 레이어 — 이제 cicd-net이 존재하므로 external 참조가 해석됨
 if [ ${#EXTRA[@]} -gt 0 ]; then
     echo "[2/2] 보조 레이어 기동 (${EXTRA[*]})..."
-    docker compose -f docker-compose.yml "${EXTRA[@]}" up -d
+    docker compose \
+      --env-file "${ENV_FILE}" \
+      -f "${COMPOSE_DIR}/cicd.yml" \
+      "${EXTRA[@]}" \
+      up -d
 fi
 
 echo -e "\n=================================================="
 docker network ls | grep cicd-net && echo "cicd-net OK"
 echo "=================================================="
-docker compose -f docker-compose.yml "${EXTRA[@]}" ps
+docker compose \
+  --env-file "${ENV_FILE}" \
+  -f "${COMPOSE_DIR}/cicd.yml" \
+  "${EXTRA[@]}" \
+  ps
+

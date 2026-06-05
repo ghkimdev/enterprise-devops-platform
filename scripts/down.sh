@@ -9,11 +9,18 @@
 #       네트워크 제거 시 경고 없이 깔끔하게 정리된다.
 
 set -euo pipefail
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+COMPOSE_DIR="${PROJECT_ROOT}/compose"
+ENV_FILE="${PROJECT_ROOT}/.env"
 
 # 존재하는 보조 레이어 자동 수집
 EXTRA=()
-for f in docker-compose.observability.yml docker-compose.nodes.yml docker-compose.agents.yml; do
+for f in \
+  "${COMPOSE_DIR}/observability.yml" \
+  "${COMPOSE_DIR}/nodes.yml" \
+  "${COMPOSE_DIR}/agents.yml"
+do
     [ -f "$f" ] && EXTRA+=(-f "$f")
 done
 
@@ -29,7 +36,12 @@ if [ "${1:-}" = "--volumes" ] || [ "${1:-}" = "-v" ]; then
     fi
 fi
 
-docker compose -f docker-compose.yml "${EXTRA[@]}" down "${DOWN_ARGS[@]}"
+docker compose \
+  --env-file "${ENV_FILE}" \
+  -f "${COMPOSE_DIR}/cicd.yml" \
+  "${EXTRA[@]}" \
+  down \
+  "${DOWN_ARGS[@]}"
 
 echo -e "\n정지 완료."
 if printf '%s\n' "${DOWN_ARGS[@]}" | grep -q -- '--volumes'; then

@@ -9,8 +9,8 @@ services:
       - "5000:5000"
       - "5001:5001"
     volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/certs:/etc/nginx/certs
+      - ../ingress/nginx/conf.d:/etc/nginx/conf.d
+      - ../certs:/etc/nginx/certs
     networks:
       - cicd-net
     healthcheck:
@@ -22,13 +22,13 @@ services:
  
   jenkins:
     build:
-      context: ./jenkins
+      context: ../cicd/jenkins
       dockerfile: docker/Dockerfile
     hostname: jenkins.example.com
     container_name: jenkins
     restart: unless-stopped
     env_file:
-      - .env
+      - ../.env
     volumes:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
@@ -46,13 +46,13 @@ services:
  
   nexus:
     build:
-      context: ./nexus
+      context: ../cicd/nexus
       dockerfile: docker/Dockerfile
     hostname: nexus.example.com
     container_name: nexus
     restart: unless-stopped
     env_file:
-      - .env
+      - ../.env
     environment:
       INSTALL4J_ADD_VM_PARAMS: ${INSTALL4J_ADD_VM_PARAMS}
     volumes:
@@ -74,7 +74,7 @@ services:
     container_name: nexus-init
     restart: "no"
     env_file:
-      - .env
+      - ../.env
     entrypoint: >
       sh -c "
         apk add --no-cache curl jq gettext &&
@@ -82,8 +82,8 @@ services:
         /scripts/init-nexus.sh
       "
     volumes:
-      - ./nexus/scripts:/scripts
-      - ./nexus/templates:/templates
+      - ../cicd/nexus/scripts:/scripts
+      - ../cicd/nexus/templates:/templates
       - nexus_data:/nexus-data
     networks:
       - cicd-net
@@ -92,7 +92,7 @@ services:
 
   rundeck:
     build:
-      context: ./rundeck
+      context: ../cicd/rundeck
       dockerfile: docker/Dockerfile
     hostname: rundeck.example.com
     container_name: rundeck
@@ -109,8 +109,8 @@ services:
       RUNDECK_JAAS_FILE_USEFIRSTPASS: 'true'
     volumes:
       - rundeck_data:/home/rundeck/server/data
-      - ./rundeck/projects:/home/rundeck/projects
-      - ./rundeck/keys:/home/rundeck/keys
+      - ../cicd/rundeck/projects:/home/rundeck/projects
+      - ../cicd/rundeck/keys:/home/rundeck/keys
     networks:
       - cicd-net
     healthcheck:
@@ -125,7 +125,7 @@ services:
 
   rundeck-init:
     build:
-      context: ./rundeck
+      context: ../cicd/rundeck
       dockerfile: docker/Dockerfile.init
     container_name: rundeck-init
     restart: "no"
@@ -133,11 +133,11 @@ services:
       rundeck:
         condition: service_healthy
     env_file:
-      - .env
+      - ../.env
     volumes:
-      - ./rundeck/projects:/home/rundeck/projects
-      - ./rundeck/keys:/home/rundeck/keys
-      - ./rundeck/scripts:/scripts
+      - ../cicd/rundeck/projects:/home/rundeck/projects
+      - ../cicd/rundeck/keys:/home/rundeck/keys
+      - ../cicd/rundeck/scripts:/scripts
     networks:
       - cicd-net
     command:
@@ -145,18 +145,18 @@ services:
 
   svn:
     build: 
-      context: ./svn
+      context: ../cicd/svn
       dockerfile: docker/Dockerfile
     hostname: svn.example.com
     container_name: svn
     restart: unless-stopped
     env_file:
-      - .env 
+      - ../.env 
     volumes:
-      - ./svn/repos:/var/svn/repos
-      - ./svn/logs:/var/log/svn-hooks
-      - ./svn/seed:/seed
-      - ./svn/hooks:/hooks
+      - ../cicd/svn/repos:/var/svn/repos
+      - ../cicd/svn/logs:/var/log/svn-hooks
+      - ../cicd/svn/seed:/seed
+      - ../cicd/svn/hooks:/hooks
     networks:
       - cicd-net
     healthcheck:
@@ -184,8 +184,8 @@ services:
     volumes:
       - ldap_conf:/etc/ldap/slapd.d
       - ldap_data:/var/lib/ldap
-      - ./ldap/ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom
-      - ./ldap/certs:/container/service/slapd/assets/certs
+      - ../identity/ldap/ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom
+      - ../identity/ldap/certs:/container/service/slapd/assets/certs
     command: --copy-service
     networks:
       - cicd-net

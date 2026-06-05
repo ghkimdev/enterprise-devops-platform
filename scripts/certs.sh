@@ -3,6 +3,14 @@
 
 set -euo pipefail 
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+CERT_ROOT="${PROJECT_ROOT}/certs"
+
+IDENTITY_DIR="${PROJECT_ROOT}/identity"
+CICD_DIR="${PROJECT_ROOT}/cicd"
+
 # ============================================
 # 설정
 # ============================================
@@ -32,35 +40,44 @@ echo ""
 # 1. 디렉토리 구조 생성
 # ============================================
 echo -e "${YELLOW}[1/11] 디렉토리 구조 생성...${NC}"
-rm -rf nginx/certs
-rm -rf ldap/certs
-rm -rf jenkins/certs
-rm -rf rundeck/certs
-rm -rf nexus/certs
-rm -rf svn/certs
-mkdir -p nginx/certs/{ldap,jenkins,rundeck,nexus,svn,grafana}
-mkdir -p ldap/certs
-mkdir -p jenkins/certs
-mkdir -p rundeck/certs
-mkdir -p nexus/certs
-mkdir -p svn/certs
+rm -rf "${CERT_ROOT:?}"/*
+mkdir -p \
+  "${CERT_ROOT}/ca" \
+  "${CERT_ROOT}/ldap" \
+  "${CERT_ROOT}/jenkins" \
+  "${CERT_ROOT}/rundeck" \
+  "${CERT_ROOT}/nexus" \
+  "${CERT_ROOT}/svn" \
+  "${CERT_ROOT}/grafana"
+mkdir -p ${IDENTITY_DIR}/identity/ldap/certs
+mkdir -p ${CICD_DIR}/jenkins/certs
+mkdir -p ${CICD_DIR}/rundeck/certs
+mkdir -p ${CICD_DIR}/nexus/certs
+mkdir -p ${CICD_DIR}/svn/certs
 echo -e "${GREEN}✓ 디렉토리 생성 완료${NC}"
 echo ""
 
-cd nginx/certs
-printf '%s' "$CA_PASS" > ca.pass
+printf '%s' "$CA_PASS" > ${CERT_ROOT}/ca/ca.pass
 
 # ============================================
 # 2. CA (인증 기관) 생성
 # ============================================
 echo -e "${YELLOW}[2/11] CA 개인키 생성...${NC}"
-openssl genrsa -aes256 -out ca.key -passout pass:${CA_PASS} ${KEY_SIZE}
+openssl genrsa -aes256 \
+  -out "${CERT_ROOT}/ca/ca.key" \
+  -passout pass:${CA_PASS} \
+  ${KEY_SIZE}
 echo -e "${GREEN}✓ CA 개인키 생성 완료${NC}"
 echo ""
 
 echo -e "${YELLOW}[3/11] CA 자체 서명 인증서 생성...${NC}"
-openssl req -new -x509 -days ${DAYS} -key ca.key -passin pass:${CA_PASS} \
-  -out ca.crt \
+openssl req \
+  -new \
+  -x509 \
+  -days "${DAYS}" \
+  -key "${CERT_ROOT}/ca/ca.key" \
+  -passin "pass:${CA_PASS}" \
+  -out "${CERT_ROOT}/ca/ca.crt" \
   -subj "/C=${COUNTRY}/ST=${STATE}/L=${CITY}/O=${ORG}/OU=${OU}/CN=${ORG}-CA"
 echo -e "${GREEN}✓ CA 인증서 생성 완료${NC}"
 echo ""
@@ -114,22 +131,29 @@ EOF
   # 인증서 발급 (SAN 포함)
   openssl x509 -req -days ${DAYS} \
     -in ${DIR}/${NAME}.csr \
-    -CA ca.crt \
-    -CAkey ca.key -passin pass:${CA_PASS} \
+    -CA "${CERT_ROOT}/ca/ca.crt" \
+    -CAkey "${CERT_ROOT}/ca/ca.key" \
+    -passin pass:${CA_PASS} \
     -CAcreateserial \
     -out ${DIR}/${NAME}.crt \
     -extensions req_ext \
     -extfile ${DIR}/san.conf
 
-  cat ${DIR}/${NAME}.crt ca.crt > ${DIR}/fullchain.pem
-  cp ${DIR}/${NAME}.key ${DIR}/privkey.pem
+  cat \
+    "${DIR}/${NAME}.crt" \
+    "${CERT_ROOT}/ca/ca.crt" \
+    > "${DIR}/fullchain.pem"
+  cp "${DIR}/${NAME}.key" \
+     "${DIR}/privkey.pem"
 }
 
 # ============================================
 # 3. LDAP 인증서 생성
 # ============================================
 echo -e "${YELLOW}[4/11] LDAP 인증서 생성...${NC}"
-create_cert_with_san "ldap" "ldap"
+create_cert_with_san \
+  "ldap" \
+  "${CERT_ROOT}/ldap"
 echo -e "${GREEN}✓ LDAP 인증서 생성 완료${NC}"
 echo ""
 
@@ -137,7 +161,9 @@ echo ""
 # 4. Jenkins 인증서 생성
 # ============================================
 echo -e "${YELLOW}[5/11] Jenkins 인증서 생성...${NC}"
-create_cert_with_san "jenkins" "jenkins"
+create_cert_with_san \
+  "jenkins" \
+  "${CERT_ROOT}/jenkins"
 echo -e "${GREEN}✓ Jenkins 인증서 생성 완료${NC}"
 echo ""
 
@@ -145,7 +171,9 @@ echo ""
 # 5. Rundeck 인증서 생성
 # ============================================
 echo -e "${YELLOW}[6/11] Rundeck 인증서 생성...${NC}"
-create_cert_with_san "rundeck" "rundeck"
+create_cert_with_san \
+  "rundeck" \
+  "${CERT_ROOT}/rundeck"
 echo -e "${GREEN}✓ Rundeck 인증서 생성 완료${NC}"
 echo ""
 
@@ -153,7 +181,9 @@ echo ""
 # 6. Nexus 인증서 생성
 # ============================================
 echo -e "${YELLOW}[7/10] Nexus 인증서 생성...${NC}"
-create_cert_with_san "nexus" "nexus"
+create_cert_with_san \
+  "nexus" \
+  "${CERT_ROOT}/nexus"
 echo -e "${GREEN}✓ Nexus 인증서 생성 완료${NC}"
 echo ""
 
@@ -161,7 +191,9 @@ echo ""
 # 7. SVN 인증서 생성
 # ============================================
 echo -e "${YELLOW}[8/10] SVN 인증서 생성...${NC}"
-create_cert_with_san "svn" "svn"
+create_cert_with_san \
+  "svn" \
+  "${CERT_ROOT}/svn"
 echo -e "${GREEN}✓ SVN 인증서 생성 완료${NC}"
 echo ""
 
@@ -169,7 +201,9 @@ echo ""
 # 8. Grafana 인증서 생성
 # ============================================
 echo -e "${YELLOW}[9/11] Grafana 인증서 생성...${NC}"
-create_cert_with_san "grafana" "grafana"
+create_cert_with_san \
+  "grafana" \
+  "${CERT_ROOT}/grafana"
 echo -e "${GREEN}✓ Grafana 인증서 생성 완료${NC}"
 echo ""
 
@@ -177,13 +211,20 @@ echo ""
 # 9. CA 인증서 배치
 # ============================================
 echo -e "${YELLOW}[10/11] CA 인증서 배치...${NC}"
-cp ca.crt ../../ldap/certs
-cp ldap/ldap.crt ../../ldap/certs
-cp ldap/ldap.key ../../ldap/certs
-cp ca.crt ../../jenkins/certs
-cp ca.crt ../../rundeck/certs
-cp ca.crt ../../nexus/certs
-cp ca.crt ../../svn/certs
+cp "${CERT_ROOT}/ca/ca.crt" \
+   "${IDENTITY_DIR}/ldap/certs"
+cp "${CERT_ROOT}/ldap/ldap.crt" \
+   "${IDENTITY_DIR}/ldap/certs"
+cp "${CERT_ROOT}/ldap/ldap.key" \
+   "${IDENTITY_DIR}/ldap/certs"
+cp "${CERT_ROOT}/ca/ca.crt" \
+   "${CICD_DIR}/jenkins/certs"
+cp "${CERT_ROOT}/ca/ca.crt" \
+   "${CICD_DIR}/rundeck/certs"
+cp "${CERT_ROOT}/ca/ca.crt" \
+   "${CICD_DIR}/nexus/certs"
+cp "${CERT_ROOT}/ca/ca.crt" \
+   "${CICD_DIR}/svn/certs"
 echo -e "${GREEN}✓ CA 인증서 배치 완료${NC}"
 echo ""
 
@@ -191,12 +232,11 @@ echo ""
 # 9. 파일 권한 설정
 # ============================================
 echo -e "${YELLOW}[11/11] 파일 권한 설정...${NC}"
-find . -name "*.key" -exec chmod 600 {} \;
-find . -name "*.crt" -exec chmod 644 {} \;
+find "${CERT_ROOT}" -name "*.key" -exec chmod 600 {} \;
+find "${CERT_ROOT}" -name "*.crt" -exec chmod 644 {} \;
+find "${CERT_ROOT}" -name "*.pem" -exec chmod 644 {} \;
 echo -e "${GREEN}✓ 파일 권한 설정 완료${NC}"
 echo ""
-
-cd ..
 
 # ============================================
 # 요약
@@ -208,31 +248,31 @@ echo ""
 echo -e "${YELLOW}생성된 인증서 및 파일:${NC}"
 echo ""
 echo "CA:"
-echo "  • nginx/certs/ca.crt (CA 공개 인증서)"
-echo "  • nginx/certs/ca.key (CA 개인키)"
+echo "  • certs/ca/ca.crt (CA 공개 인증서)"
+echo "  • certs/ca/ca.key (CA 개인키)"
 echo ""
 echo "LDAP (LDAPS):"
-echo "  • nginx/certs/ldap/ldap.crt"
-echo "  • nginx/certs/ldap/ldap.key"
+echo "  • certs/ldap/ldap.crt"
+echo "  • certs/ldap/ldap.key"
 echo ""
 echo "Jenkins:"
-echo "  • nginx/certs/jenkins/jenkins.crt"
-echo "  • nginx/certs/jenkins/jenkins.key"
+echo "  • certs/jenkins/jenkins.crt"
+echo "  • certs/jenkins/jenkins.key"
 echo ""
 echo "Rundeck:"
-echo "  • nginx/certs/rundeck/rundeck.crt"
-echo "  • nginx/certs/rundeck/rundeck.key"
+echo "  • certs/rundeck/rundeck.crt"
+echo "  • certs/rundeck/rundeck.key"
 echo ""
 echo "Nexus:"
-echo "  • nginx/certs/nexus/nexus.crt"
-echo "  • nginx/certs/nexus/nexus.key"
+echo "  • certs/nexus/nexus.crt"
+echo "  • certs/nexus/nexus.key"
 echo ""
 echo "SVN:"
-echo "  • nginx/certs/svn/svn.crt"
-echo "  • nginx/certs/svn/svn.key"
+echo "  • certs/svn/svn.crt"
+echo "  • certs/svn/svn.key"
 echo ""
 echo "Grafana:"
-echo "  • nginx/certs/grafana/grafana.crt"
-echo "  • nginx/certs/grafana/grafana.key"
+echo "  • certs/grafana/grafana.crt"
+echo "  • certs/grafana/grafana.key"
 echo ""
 echo -e "${BLUE}========================================${NC}"

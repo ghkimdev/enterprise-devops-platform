@@ -1,11 +1,11 @@
 .env
-jenkins/certs
-ldap/certs
-nexus/certs
-nginx/certs
-rundeck/certs
-rundeck/keys
-svn/certs
-svn/repos
-svn/logs
+certs
+identity/ldap/certs
+cicd/jenkins/certs
+cicd/nexus/certs
+cicd/rundeck/certs
+cicd/rundeck/keys
+cicd/svn/certs
+cicd/svn/repos
+cicd/svn/logs
 
