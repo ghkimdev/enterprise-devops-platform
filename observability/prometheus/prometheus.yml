@@ -60,3 +60,8 @@ scrape_configs:
     static_configs:
     - targets:
       - cadvisor:8080
+
+  - job_name: 'jenkins'
+    metrics_path: /prometheus/
+    static_configs:
+      - targets: ['jenkins:8080']

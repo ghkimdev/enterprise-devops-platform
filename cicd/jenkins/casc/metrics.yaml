@@ -1,0 +1,8 @@
+unclassified:
+  prometheusConfiguration:
+    path: "prometheus"                 # 엔드포인트: /prometheus/
+    defaultNamespace: "default"
+    useAuthenticatedEndpoint: false    
+    collectingMetricsPeriodInSeconds: 120
+
+

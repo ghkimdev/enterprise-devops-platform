@@ -25,3 +25,4 @@ rundeck:3.6.14
 docker-plugin:1316.v75635a_002b_0a_
 folder-auth:217.vd5b_18537403e
 maven-artifact-choicelistprovider:371.ve708f79022db_
+prometheus:852.v317db_5d17a_b_0
