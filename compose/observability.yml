@@ -23,6 +23,26 @@ services:
       retries: 5
       start_period: 20s
 
+  pushgateway:
+    image: prom/pushgateway:v1.11.3
+    container_name: pushgateway
+    restart: unless-stopped
+    ports:
+      - "9091:9091"
+    volumes:
+      - pushgateway_data:/pushgateway
+    command:
+      - '--persistence.file=/pushgateway/metrics'
+      - '--persistence.interval=5m'
+    networks:
+      - cicd-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9091/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
 networks:
   cicd-net:
     external: true
@@ -30,4 +50,6 @@ networks:
 
 volumes:
   prometheus_data:
+  pushgateway_data:
+
 
