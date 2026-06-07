@@ -149,6 +149,8 @@ services:
     ports:
       - 3000:3000
     volumes:
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     networks:
       - cicd-net
