@@ -1,4 +1,5 @@
 .env
+backups
 certs
 identity/ldap/certs
 cicd/jenkins/certs
