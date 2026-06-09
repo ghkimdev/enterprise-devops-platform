@@ -172,7 +172,16 @@ ${rows}
 
         post {
             success {
-                echo """
+                script {
+                    metricsHelper.pushDeploy(
+                        app: config.appName,
+                        env: params.TARGET_ENV,
+                        team: config.team,
+                        release: env.RELEASE_NAME, 
+                        version: env.APP_VERSION,
+                        result: 'success'
+                    )
+                    echo """
 ==================================================
 DEPLOY SUCCESS
 ==================================================
@@ -180,7 +189,22 @@ APP         : ${config.appName}
 RELEASE     : ${env.RELEASE_NAME}
 ENV         : ${params.TARGET_ENV}
 =================================================="""
+                }
             }
+
+            failure {
+                script {
+                    metricsHelper.pushDeploy(
+                        app: config.appName, 
+                        env: params.TARGET_ENV, 
+                        team: config.team,
+                        release: env.RELEASE_NAME ?: 'unknown',
+                        version: env.APP_VERSION ?: 'unknown',
+                        result: 'fail'
+                    )
+                }
+            }
+
             always {
                 cleanWs()
             }
