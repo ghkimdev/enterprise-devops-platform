@@ -9,4 +9,4 @@ cicd/rundeck/keys
 cicd/svn/certs
 cicd/svn/repos
 cicd/svn/logs
-
+observability/prometheus/secrets

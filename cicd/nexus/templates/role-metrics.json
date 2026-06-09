@@ -1,0 +1,10 @@
+{
+  "id": "metrics",
+  "name": "metrics",
+  "description": "Metrics Role",
+  "privileges": [
+    "nx-metrics-all"
+  ],
+  "roles": []
+}
+

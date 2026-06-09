@@ -1,0 +1,11 @@
+{
+  "userId": "metrics",
+  "firstName": "Metrics",
+  "lastName": "Scraper",
+  "emailAddress": "metrics@example.com",
+  "password": "${NEXUS_METRICS_PASSWORD}",
+  "status": "active",
+  "roles": [
+    "metrics"
+  ]
+}

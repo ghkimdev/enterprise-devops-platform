@@ -128,6 +128,14 @@ ldap_exists() {
     | jq -e ".[] | select(.name == \"LDAP\")" > /dev/null
 }
 
+user_exists() {
+    curl -s \
+        -u "${ADMIN_USER}:${ADMIN_PASS}" \
+        "${NEXUS_URL}/service/rest/v1/security/users?userId=$1&source=default" \
+    | jq -e --arg uid "$1" \
+        '.[] | select(.userId == $uid and .source == "default")' > /dev/null
+}
+ 
 # -----------------------------------------------------------------------------
 # Generate LDAP configuration
 # -----------------------------------------------------------------------------
@@ -143,6 +151,10 @@ ${LDAP_BIND_PASSWORD}
 ${LDAP_USER_BASE}
 ${LDAP_ROLE_BASE}
 ' < /templates/ldap.json.template > /tmp/ldap.json
+
+echo "[INFO] Generating User configuration..."
+envsubst '${NEXUS_METRICS_PASSWORD}
+' < /templates/user-metrics.json.template > /tmp/user-metrics.json
 
 # -----------------------------------------------------------------------------
 # Blob Store Provisioning
@@ -325,6 +337,28 @@ else
         POST \
         "/service/rest/v1/security/roles" \
         "/templates/role-admin.json"
+fi
+
+if role_exists "metrics"; then
+    echo "[SKIP] metrics role already exists"
+else
+    api_request \
+        POST \
+        "/service/rest/v1/security/roles" \
+        "/templates/role-metrics.json"
+fi
+
+# -----------------------------------------------------------------------------
+# User Provisioning
+# -----------------------------------------------------------------------------
+
+if user_exists "metrics"; then
+    echo "[SKIP] local metrics user already exists"
+else
+    api_request \
+         POST \
+         "/service/rest/v1/security/users" \
+         "/tmp/user-metrics.json"
 fi
 
 # -----------------------------------------------------------------------------

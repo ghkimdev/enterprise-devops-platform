@@ -68,14 +68,14 @@ scrape_configs:
     static_configs:
       - targets: ['jenkins:8080']
 
-  - job_name: "nexus"
+  - job_name: 'nexus'
     scrape_interval: 15s
     scrape_timeout: 10s
     metrics_path: /service/rest/metrics/prometheus
     scheme: http
     basic_auth:
-      username: admin
-      password: admin
+      username: 'metrics'
+      password_file: /etc/prometheus/secrets/nexus_metrics 
     static_configs:
       - targets: ["nexus:8081"]
 
