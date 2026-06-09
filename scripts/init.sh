@@ -26,18 +26,30 @@ REGISTRY="nexus.example.com:5000"
 DOMAINS=(jenkins.example.com nexus.example.com rundeck.example.com svn.example.com grafana.example.com)
 HOSTS_MARKER="# enterprise-devops-platform"
 KEY_DIR="${PROJECT_ROOT}/cicd/rundeck/keys/project/sample"
+SECRET_DIR="${PROJECT_ROOT}/observability/prometheus/secrets"
 
 # ── 1) .env 생성 ────────────────────────────────────────────────────
 step 1 ".env 생성"
-if [ -f .env ]; then
+if [ -f "${PROJECT_ROOT}/.env" ]; then
     skip ".env"
 else
     cp ${PROJECT_ROOT}/.env.example ${PROJECT_ROOT}/.env
     ok ".env 생성 — ${RED}비밀번호 값(<change-me>)을 반드시 수정하세요${NC}"
 fi
 
-# ── 2) TLS 인증서 ───────────────────────────────────────────────────
-step 2 "TLS 인증서 생성 (certs.sh)"
+# ── 2) Nexus metrics 패스워드 ───────────────────────────────────────
+step 2 "Nexus metrics 패스워드"
+if [ -f "${SECRET_DIR}/nexus_metrics" ]; then
+    skip "Nexus metrics"
+else
+    mkdir -p ${SECRET_DIR}
+    grep '^NEXUS_METRICS_PASSWORD=' ${PROJECT_ROOT}/.env | cut -d= -f2- | tr -d '\n' \
+      > ${SECRET_DIR}/nexus_metrics
+    ok "nexus_password 생성 — ${RED}비밀번호 값(<change-me>)을 반드시 수정하세요${NC}"
+fi
+
+# ── 3) TLS 인증서 ───────────────────────────────────────────────────
+step 3 "TLS 인증서 생성 (certs.sh)"
 if [ -f "${CA_CRT}" ]; then
     skip "인증서"
 else
@@ -45,8 +57,8 @@ else
     ok "인증서 생성 (CA: ${CA_CRT})"
 fi
 
-# ── 3) Rundeck 배포 SSH 키 ──────────────────────────────────────────
-step 3 "Rundeck 배포 SSH 키"
+# ── 4) Rundeck 배포 SSH 키 ──────────────────────────────────────────
+step 4 "Rundeck 배포 SSH 키"
 if [ -f "${KEY_DIR}/deploy-key" ]; then
     skip "deploy-key"
 else
@@ -57,8 +69,8 @@ else
     echo -e "    ${RED}주의: 개인키(deploy-key)는 .gitignore에 rundeck/keys/ 포함 확인${NC}"
 fi
 
-# ── 4) /etc/hosts 사설 도메인 ───────────────────────────────────────
-step 4 "/etc/hosts 도메인 등록"
+# ── 5) /etc/hosts 사설 도메인 ───────────────────────────────────────
+step 5 "/etc/hosts 도메인 등록"
 if grep -q "${HOSTS_MARKER}" /etc/hosts; then
     skip "도메인"
 else
@@ -69,20 +81,20 @@ else
     ok "등록: ${DOMAINS[*]} → 127.0.0.1"
 fi
 
-# ── 5) 시스템 CA 신뢰 (호스트 curl 등이 사설 CA 신뢰) ───────────────
-step 5 "시스템 CA 신뢰 등록"
+# ── 6) 시스템 CA 신뢰 (호스트 curl 등이 사설 CA 신뢰) ───────────────
+step 6 "시스템 CA 신뢰 등록"
 sudo cp "${CA_CRT}" /usr/local/share/ca-certificates/enterprise-devops-platform.crt
 sudo update-ca-certificates >/dev/null
 ok "update-ca-certificates 완료"
 
-# ── 6) Docker registry CA (push/pull 인증서 검증용) ─────────────────
-step 6 "Docker registry CA 등록 (${REGISTRY})"
+# ── 7) Docker registry CA (push/pull 인증서 검증용) ─────────────────
+step 7 "Docker registry CA 등록 (${REGISTRY})"
 sudo mkdir -p "/etc/docker/certs.d/${REGISTRY}"
 sudo cp "${CA_CRT}" "/etc/docker/certs.d/${REGISTRY}/ca.crt"
 ok "/etc/docker/certs.d/${REGISTRY}/ca.crt"
 
-# ── 7) docker 그룹 권한 ─────────────────────────────────────────────
-step 7 "docker 그룹 권한"
+# ── 8) docker 그룹 권한 ─────────────────────────────────────────────
+step 8 "docker 그룹 권한"
 ME="$(id -un)"
 if id -nG "${ME}" | grep -qw docker; then
     skip "${ME} 이미 docker 그룹 소속"
