@@ -140,7 +140,7 @@ services:
 
   grafana:
     image: grafana/grafana:13.0.2
-    container_name: observability-grafana
+    container_name: grafana
     restart: unless-stopped
     environment:
       - GF_FEATURE_TOGGLES_ENABLE=grafanaManagedRecordingRules
@@ -175,6 +175,8 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro          # ← cgroup v2 마운트 추가
+      - /var/run/docker.sock:/var/run/docker.sock:ro   # ← docker.sock 명시적 추가
     networks:
       - cicd-net
     healthcheck:
