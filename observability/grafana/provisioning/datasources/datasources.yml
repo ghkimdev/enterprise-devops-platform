@@ -5,8 +5,9 @@ datasources:
     type: prometheus
     access: proxy
     url: http://prometheus:9090
+    isDefault: true
     jsonData:
-      httpMethod: POST
+      timeInterval: 15s
 
   - name: Loki
     type: loki
@@ -15,3 +16,12 @@ datasources:
     jsonData:
       timeout: 60
       maxLines: 1000
+
+  - name: Alertmanager
+    uid: alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: false
