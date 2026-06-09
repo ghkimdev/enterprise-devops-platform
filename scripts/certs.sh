@@ -49,7 +49,7 @@ mkdir -p \
   "${CERT_ROOT}/nexus" \
   "${CERT_ROOT}/svn" \
   "${CERT_ROOT}/grafana"
-mkdir -p ${IDENTITY_DIR}/identity/ldap/certs
+mkdir -p ${IDENTITY_DIR}/ldap/certs
 mkdir -p ${CICD_DIR}/jenkins/certs
 mkdir -p ${CICD_DIR}/rundeck/certs
 mkdir -p ${CICD_DIR}/nexus/certs
