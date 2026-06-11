@@ -19,12 +19,12 @@ rule_files:
 scrape_configs:
   # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
   - job_name: 'prometheus'
-
-    # Override the global default and scrape targets from this job every 5 seconds.
-    scrape_interval: 5s
-
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ['prometheus:9090']
+
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
 
   - job_name: 'pushgateway'
     honor_labels: true
@@ -57,11 +57,9 @@ scrape_configs:
     static_configs:
       - targets: ['blackbox-exporter:9115']
 
-  - job_name: cadvisor
-    scrape_interval: 15s
+  - job_name: 'cadvisor'
     static_configs:
-    - targets:
-      - cadvisor:8080
+    - targets: ['cadvisor:8080']
 
   - job_name: 'jenkins'
     metrics_path: /prometheus/
