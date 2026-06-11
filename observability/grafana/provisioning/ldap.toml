@@ -1,0 +1,56 @@
+# Grafana LDAP 설정 (ldaps://ldap:636)
+# 기존 LDAP 디렉토리(ou=users / ou=roles, groupOfUniqueNames)를 그대로 사용.
+# Jenkins·Nexus와 동일한 중앙 인증에 Grafana를 통합한다.
+
+[[servers]]
+host = "ldap"
+port = 636
+use_ssl = true
+start_tls = false
+ssl_skip_verify = false
+# 사설 CA로 서명된 LDAP 인증서를 신뢰하기 위한 CA 번들
+root_ca_cert = "/etc/grafana/ldap/ca.crt"
+
+# 바인드(검색) 계정 — 비밀번호는 환경변수에서 주입
+bind_dn = "cn=admin,dc=example,dc=com"
+bind_password = "${LDAP_BIND_PASSWORD}"
+
+# 사용자 검색: uid 로 로그인
+search_filter = "(uid=%s)"
+search_base_dns = ["ou=users,dc=example,dc=com"]
+
+# inetOrgPerson 속성 매핑
+[servers.attributes]
+name = "givenName"
+surname = "sn"
+username = "uid"
+member_of = "memberOf"
+email = "mail"
+
+# ── 그룹 → Grafana 조직 역할 매핑 ────────────────────────────────────
+# openldap(osixia)은 기본적으로 memberOf overlay 가 없을 수 있으므로,
+# group_search_* 로 ou=roles 의 groupOfUniqueNames(uniqueMember)를 역으로 조회한다.
+group_search_filter = "(&(objectClass=groupOfUniqueNames)(uniqueMember=%s))"
+group_search_base_dns = ["ou=roles,dc=example,dc=com"]
+group_search_filter_user_attribute = "dn"
+
+# admin 그룹 → Grafana Admin
+[[servers.group_mappings]]
+group_dn = "cn=admin,ou=roles,dc=example,dc=com"
+org_role = "Admin"
+grafana_admin = true
+
+# SRE/온콜·팀 리드 성격의 prod-oncall → Editor (대시보드 편집 가능)
+[[servers.group_mappings]]
+group_dn = "cn=prod-oncall,ou=roles,dc=example,dc=com"
+org_role = "Editor"
+
+# 그 외 모든 인증 사용자(user 그룹) → Viewer
+[[servers.group_mappings]]
+group_dn = "cn=user,ou=roles,dc=example,dc=com"
+org_role = "Viewer"
+
+# 위 어디에도 안 걸리면 역할 없음(=접근 거부). 필요 시 아래 주석 해제로 기본 Viewer 허용.
+ [[servers.group_mappings]]
+ group_dn = "*"
+ org_role = "Viewer"
