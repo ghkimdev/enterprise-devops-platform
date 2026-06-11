@@ -113,7 +113,7 @@ install_hooks() {
 for repo in sample-spring sample-react sample-fastapi; do
     repo_path="${REPOS_ROOT}/${repo}"
     create_repo  "${repo}" "${repo_path}" with_initial_tag
-    install_hooks "${repo_path}" pre-commit post-commit
+    install_hooks "${repo_path}" pre-commit 
 done
 
 # ══════════════════════════════════════════════
@@ -123,6 +123,6 @@ done
 SHARED="cicd-shared-library"
 SHARED_PATH="${REPOS_ROOT}/${SHARED}"
 create_repo  "${SHARED}" "${SHARED_PATH}"
-install_hooks "${SHARED_PATH}" pre-commit post-commit
+install_hooks "${SHARED_PATH}" pre-commit
 
 log "SVN bootstrap 완료"
