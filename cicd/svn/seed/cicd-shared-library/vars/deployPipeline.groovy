@@ -200,7 +200,7 @@ ENV         : ${params.TARGET_ENV}
                         team: config.team,
                         release: env.RELEASE_NAME ?: 'unknown',
                         version: env.APP_VERSION ?: 'unknown',
-                        result: 'fail'
+                        result: 'failure'
                     )
                 }
             }

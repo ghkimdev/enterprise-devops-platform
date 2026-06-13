@@ -50,12 +50,8 @@ ruler:
   enable_alertmanager_discovery: true
   enable_api: true
 
-
-
-
 frontend:
   encoding: protobuf
-
 
 compactor:
   working_directory: /tmp/loki/retention
