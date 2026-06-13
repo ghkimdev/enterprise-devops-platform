@@ -1,0 +1,42 @@
+# 20-infra-container.yml
+# 컨테이너 (domain=infra, cadvisor)
+#
+# name!="" : 실제 도커 컨테이너만 (cgroup 슬라이스 제외)
+# name!~".*-init" : nexus-init/rundeck-init 등 restart:"no" 1회성 컨테이너 제외(정상 종료를 오탐하지 않도록)
+groups:
+  - name: infra-container
+    rules:
+      # OOM 으로 컨테이너 내 프로세스가 종료됨 (cadvisor v0.55 의 oom_events 카운터)
+      - alert: ContainerOOMKilled
+        expr: increase(container_oom_events_total{name!=""}[10m]) > 0
+        labels:
+          severity: warning
+          domain: infra
+        annotations:
+          summary: "컨테이너 OOM 발생: {{ $labels.name }}"
+          description: "{{ $labels.name }} 에서 최근 10분 내 OOM 이벤트가 발생했습니다. 메모리 한계 또는 누수를 확인하세요."
+
+      # 크래시 루프: 15분 내 시작시각이 2회 초과로 바뀜 = 반복 재시작
+      - alert: ContainerRestartingFrequently
+        expr: changes(container_start_time_seconds{name!="", name!~".*-init"}[15m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          domain: infra
+        annotations:
+          summary: "컨테이너 반복 재시작: {{ $labels.name }}"
+          description: "{{ $labels.name }} 가 최근 15분간 2회 넘게 재시작되었습니다(크래시 루프 의심)."
+
+      # 메모리 한계 근접 — compose 에 mem_limit 가 설정된 컨테이너만 발화(limit>0 가드).
+      # 현재 compose 는 limit 미설정이라 즉시 발화하지 않음. 한계를 걸면 자동으로 유효해짐.
+      - alert: ContainerHighMemory
+        expr: |
+          (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""} > 0.9)
+          and (container_spec_memory_limit_bytes{name!=""} > 0)
+        for: 10m
+        labels:
+          severity: warning
+          domain: infra
+        annotations:
+          summary: "컨테이너 메모리 한계 근접: {{ $labels.name }} ({{ $value | humanizePercentage }})"
+          description: "{{ $labels.name }} 의 메모리 사용량이 설정 한계의 90%를 초과했습니다."

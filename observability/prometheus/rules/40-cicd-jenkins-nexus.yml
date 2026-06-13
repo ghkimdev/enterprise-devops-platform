@@ -1,0 +1,67 @@
+# 40-cicd-jenkins-nexus.yml
+# Jenkins / Nexus (domain=cicd)
+#
+#  메트릭 이름 라이브 확인 완료:
+#   Jenkins (prometheus 플러그인): jenkins_*_value, default_jenkins_builds_*  — 추측과 일치
+#   Nexus   (Dropwizard 형식)    : jvm_memory_heap_usage(=used/max 비율), jvm_memory_pools_G1_Old_Gen_usage
+# 참고: Nexus 는 '블롭스토어 여유 공간' 게이지를 노출하지 않음(timer/counter 뿐).
+#       → 블롭스토어 포화는 10-infra-host.yml 의 호스트 디스크 경보로 커버.
+groups:
+  - name: cicd-jenkins
+    rules:
+      # 큐에 스케줄 불가(stuck) 작업이 쌓임 = 에이전트 고갈/라벨 불일치
+      - alert: JenkinsBuildQueueStuck
+        expr: jenkins_queue_stuck_value > 0
+        for: 15m
+        labels:
+          severity: warning
+          domain: cicd
+        annotations:
+          summary: "Jenkins 빌드 큐 정체 ({{ $value }} stuck)"
+          description: "스케줄되지 못한 작업이 15분 이상 큐에 남아 있습니다. 온라인 에이전트/라벨을 확인하세요."
+
+      # 온라인 노드 없음 = 빌드 실행 불가
+      - alert: JenkinsNoOnlineNodes
+        expr: jenkins_node_online_value < 1
+        for: 5m
+        labels:
+          severity: critical
+          domain: cicd
+        annotations:
+          summary: "Jenkins 온라인 노드 없음"
+          description: "온라인 빌드 노드가 없어 모든 빌드가 실행되지 못합니다."
+
+      # 마지막 빌드 결과가 FAILURE(ordinal>=2: 2=FAILURE,4=ABORTED) 인 잡
+      - alert: JenkinsJobLastBuildFailed
+        expr: default_jenkins_builds_last_build_result_ordinal >= 2
+        for: 10m
+        labels:
+          severity: warning
+          domain: cicd
+        annotations:
+          summary: "Jenkins 잡 빌드 실패 상태: {{ $labels.jenkins_job }}"
+          description: "{{ $labels.jenkins_job }} 의 마지막 빌드 결과가 실패/중단 상태입니다."
+
+  - name: cicd-nexus
+    rules:
+      # JVM 힙 사용률 높음 (Nexus OOM 예방). jvm_memory_heap_usage 는 used/max 비율(0~1).
+      - alert: NexusJvmHeapHigh
+        expr: 100 * jvm_memory_heap_usage > 90
+        for: 10m
+        labels:
+          severity: warning
+          domain: cicd
+        annotations:
+          summary: "Nexus JVM 힙 높음: {{ $labels.instance }} ({{ printf \"%.0f\" $value }}%)"
+          description: "JVM 힙 사용률이 10분 이상 90%를 초과합니다. 힙 증설 또는 누수 점검이 필요합니다."
+
+      # G1 Old Gen 압박 = 회수 안 되는 객체 누적, OOM 선행 신호(Eden 과 달리 GC 후에도 높으면 위험).
+      - alert: NexusOldGenHigh
+        expr: 100 * jvm_memory_pools_G1_Old_Gen_usage > 90
+        for: 15m
+        labels:
+          severity: warning
+          domain: cicd
+        annotations:
+          summary: "Nexus G1 Old Gen 높음: {{ $labels.instance }} ({{ printf \"%.0f\" $value }}%)"
+          description: "Old Gen 사용률이 15분 이상 90%를 초과합니다. GC 가 회수하지 못하는 상태로 OOM 위험이 큽니다."

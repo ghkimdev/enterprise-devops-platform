@@ -1,0 +1,54 @@
+# 00-meta.yml
+# 관측 스택 자가 모니터링 (domain=observability)
+#
+# alertmanager.yml 계약:
+#   - Watchdog      : alertname="Watchdog" → watchdog 라우트(외부 dead-man's-switch). severity=none 이라 inhibit 제외.
+#   - severity      : critical → devops-team(페이징), warning → 동일 (alertname+instance) critical 있으면 음소거.
+#   - group_by      : [alertname, domain, instance]
+groups:
+  - name: meta-observability
+    rules:
+      # 항상 발화하는 신호. 이 알림이 외부 DMS 로 더 이상 도달하지 않으면
+      # = Prometheus/Alertmanager/네트워크 중 어딘가가 죽은 것으로 외부 모니터가 판단.
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+          domain: observability
+        annotations:
+          summary: "관측 파이프라인 heartbeat (정상이면 계속 발화)"
+          description: >-
+            이 알림은 의도적으로 항상 발화하며 alertmanager 의 watchdog 라우트를 통해
+            외부 dead-man's-switch 로 전달됩니다. 전달이 끊기면 관측 스택 장애로 간주하세요.
+
+      # 모든 스크레이프 타깃 공통. job/instance 별로 개별 발화.
+      # 주의: job="blackbox" 의 up 은 '블랙박스 익스포터가 응답했는가'이지 프로브 대상의 가용성이 아님.
+      #       프로브 대상(jenkins/nexus/rundeck/svn) 다운은 30-blackbox.yml 의 probe_success 로 잡음.
+      - alert: TargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "스크레이프 타깃 다운: {{ $labels.job }} ({{ $labels.instance }})"
+          description: "{{ $labels.instance }} (job={{ $labels.job }}) 가 5분 이상 스크레이프되지 않습니다."
+
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: warning
+          domain: observability
+        annotations:
+          summary: "Prometheus 설정 리로드 실패"
+          description: "마지막 prometheus.yml 리로드가 실패했습니다. 신규 룰/스크레이프 변경이 반영되지 않습니다."
+
+      - alert: AlertmanagerNotificationsFailing
+        expr: rate(alertmanager_notifications_failed_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          domain: observability
+        annotations:
+          summary: "Alertmanager 알림 전송 실패: {{ $labels.integration }}"
+          description: "최근 5분간 {{ $labels.integration }} 통합으로의 알림 전송 실패가 발생하고 있습니다."

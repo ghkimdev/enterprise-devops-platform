@@ -1,116 +1,69 @@
 global:
-  # The smarthost and SMTP sender used for mail notifications.
   smtp_smarthost: 'mailhog:1025'
-  smtp_from: 'alertmanager@example.org'
+  smtp_from: 'alertmanager@example.com'
+  smtp_require_tls: false
 
-# The root route on which each incoming alert enters.
 route:
-  # The labels by which incoming alerts are grouped together. For example,
-  # multiple alerts coming in for cluster=A and alertname=LatencyHigh would
-  # be batched into a single group.
-  #
-  # To aggregate by all possible labels use '...' as the sole label name.
-  # This effectively disables aggregation entirely, passing through all
-  # alerts as-is. This is unlikely to be what you want, unless you have
-  # a very low alert volume or your upstream notification system performs
-  # its own grouping. Example: group_by: [...]
-  group_by: ['alertname', 'cluster', 'service']
-
-  # When a new group of alerts is created by an incoming alert, wait at
-  # least 'group_wait' to send the initial notification.
-  # This way ensures that you get multiple alerts for the same group that start
-  # firing shortly after another are batched together on the first
-  # notification.
+  # 우리가 실제로 emit 하는 라벨로 그룹화 (alertname/domain/instance)
+  group_by: ['alertname', 'domain', 'instance']
   group_wait: 30s
-
-  # When the first notification was sent, wait 'group_interval' to send a batch
-  # of new alerts that started firing for that group.
   group_interval: 5m
-
-  # If an alert has successfully been sent, wait 'repeat_interval' to
-  # resend them.
   repeat_interval: 3h
+  # 기본 수신자 — 매칭 안 되는 모든 알림은 devops 로 (기존의 정의 안 된 team-X-mails 수정)
+  receiver: devops-team
 
-  # A default receiver
-  receiver: team-X-mails
-
-  # All the above attributes are inherited by all child routes and can
-  # overwritten on each.
-
-  # The child route trees.
   routes:
-    # This routes performs a regular expression match on alert labels to
-    # catch alerts that are related to a list of services.
-    - matchers:
-        - service=~"foo1|foo2|baz"
-      receiver: team-X-mails
-      # The service has a sub-route for critical alerts, any alerts
-      # that do not match, i.e. severity != critical, fall-back to the
-      # parent node and are sent to 'team-X-mails'
-      routes:
-        - matchers:
-            - severity="critical"
-          receiver: team-X-pager
-    - matchers:
-        - service="files"
-      receiver: team-Y-mails
+    # Watchdog — 항상 발화하는 신호. 이메일이 아니라 외부 DeadMansSwitch 로만 보낸다.
+    - matchers: [ 'alertname = "Watchdog"' ]
+      receiver: watchdog
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+      continue: false
 
-      routes:
-        - matchers:
-            - severity="critical"
-          receiver: team-Y-pager
+    # 배포 실패는 소유 팀으로 라우팅 (DeployFailed 가 app 라벨을 가짐).
+    # critical 은 devops 에도 함께 통지하기 위해 continue: true.
+    - matchers: [ 'app =~ "sample-spring|.*spring.*"' ]
+      receiver: payment-team
+      continue: true
+    - matchers: [ 'app =~ "sample-react|.*react.*"' ]
+      receiver: web-team
+      continue: true
+    - matchers: [ 'app =~ "sample-fastapi|.*fastapi.*"' ]
+      receiver: ml-team
+      continue: true
 
-    # This route handles all alerts coming from a database service. If there's
-    # no team to handle it, it defaults to the DB team.
-    - matchers:
-        - service="database"
-      receiver: team-DB-pager
-      # Also group alerts by affected database.
-      group_by: [alertname, cluster, database]
-      routes:
-        - matchers:
-            - owner="team-X"
-          receiver: team-X-pager
-          continue: true
-        - matchers:
-            - owner="team-Y"
-          receiver: team-Y-pager
+    # 모든 critical 은 devops 로 (페이징 대상)
+    - matchers: [ 'severity = "critical"' ]
+      receiver: devops-team
 
-
-# Inhibition rules allow to mute a set of alerts given that another alert is
-# firing.
-# We use this to mute any warning-level notifications if the same alert is
-# already critical.
+# critical 이 떠 있으면 같은 대상(alertname+instance)의 warning 은 음소거.
+# Watchdog(severity=none)은 음소거 대상에서 제외.
 inhibit_rules:
-  - source_matchers: [severity="critical"]
-    target_matchers: [severity="warning"]
-    # Apply inhibition if the alertname is the same.
-    # CAUTION:
-    #   If all label names listed in `equal` are missing
-    #   from both the source and target alerts,
-    #   the inhibition rule will apply!
-    equal: [alertname, cluster, service]
-
+  - source_matchers: [ 'severity = "critical"' ]
+    target_matchers: [ 'severity = "warning"' ]
+    equal: ['alertname', 'instance']
 
 receivers:
-  - name: 'team-X-mails'
+  - name: 'devops-team'
     email_configs:
-      - to: 'team-X+alerts@example.org'
+      - to: 'devops-team@example.com'
 
-  - name: 'team-X-pager'
+  - name: 'payment-team'
     email_configs:
-      - to: 'team-X+alerts-critical@example.org'
-    pagerduty_configs:
-      - service_key: <team-X-key>
+      - to: 'payment-team@example.com'
 
-  - name: 'team-Y-mails'
+  - name: 'web-team'
     email_configs:
-      - to: 'team-Y+alerts@example.org'
+      - to: 'web-team@example.com'
 
-  - name: 'team-Y-pager'
-    pagerduty_configs:
-      - service_key: <team-Y-key>
+  - name: 'ml-team'
+    email_configs:
+      - to: 'ml-team@example.com'
 
-  - name: 'team-DB-pager'
-    pagerduty_configs:
-      - service_key: <team-DB-key>
+  # Watchdog 수신자 — 외부 dead man's switch(healthchecks.io 등)의 ping URL.
+  # 이 알림이 끊기면 외부 모니터가 관측 스택 장애로 판단한다.
+  - name: 'watchdog'
+    webhook_configs:
+      - url: 'https://hc-ping.example.com/REPLACE_WITH_DEADMANSSWITCH_UUID'
+        send_resolved: false

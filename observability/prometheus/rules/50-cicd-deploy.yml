@@ -1,0 +1,72 @@
+# 50-cicd-deploy.yml
+# 배포 결과 (domain=cicd, pushgateway: job="cd_deploy")
+#
+# 메트릭(metricsHelper.pushDeploy):
+#   cd_deploy_timestamp_seconds{app,env,result}  = 마지막 push 의 unix초(=배포 시각)
+#   cd_deploy_duration_seconds{app,env,result}   = 배포 소요(초)
+#   cd_deploy_info{app,env,result,team,release,version} = 1
+# result 라벨값: success | failure 
+#
+# Pushgateway 는 그룹별 '마지막 값'을 영구 보존 → '실패가 최신 + 최근 30분' 조건으로만 발화(자동 해제).
+# app 라벨이 alertmanager 팀 라우팅(payment/web/ml)을 구동. prod=critical, 그 외=warning.
+groups:
+  - name: cicd-deploy
+    rules:
+      # 운영(prod) 배포 실패 → critical (devops 페이징 + 소유 팀 통지)
+      - alert: DeployFailed
+        expr: |
+          (
+            max by (app, env) (cd_deploy_timestamp_seconds{result="failure", env="prod"})
+            >
+            (
+              max by (app, env) (cd_deploy_timestamp_seconds{result="success", env="prod"})
+              or
+              (max by (app, env) (cd_deploy_timestamp_seconds{result="failure", env="prod"}) * 0)
+            )
+          )
+          and
+          (
+            (time() - max by (app, env) (cd_deploy_timestamp_seconds{result="failure", env="prod"})) < 1800
+          )
+        labels:
+          severity: critical
+          domain: cicd
+        annotations:
+          summary: "배포 실패(prod): {{ $labels.app }}"
+          description: "{{ $labels.app }} 의 prod 배포가 실패했고, 이후 성공 배포가 없습니다(최근 30분 내)."
+
+      # 비운영(dev/stg) 배포 실패 → warning
+      - alert: DeployFailed
+        expr: |
+          (
+            max by (app, env) (cd_deploy_timestamp_seconds{result="failure", env!="prod"})
+            >
+            (
+              max by (app, env) (cd_deploy_timestamp_seconds{result="success", env!="prod"})
+              or
+              (max by (app, env) (cd_deploy_timestamp_seconds{result="failure", env!="prod"}) * 0)
+            )
+          )
+          and
+          (
+            (time() - max by (app, env) (cd_deploy_timestamp_seconds{result="failure", env!="prod"})) < 1800
+          )
+        labels:
+          severity: warning
+          domain: cicd
+        annotations:
+          summary: "배포 실패({{ $labels.env }}): {{ $labels.app }}"
+          description: "{{ $labels.app }} 의 {{ $labels.env }} 배포가 실패했고, 이후 성공 배포가 없습니다(최근 30분 내)."
+
+      # 최근(6시간 내) 성공 배포의 소요시간이 비정상적으로 김 → warning (임계 600s, 조정 가능)
+      - alert: DeployDurationHigh
+        expr: |
+          (cd_deploy_duration_seconds{result="success"} > 600)
+          and
+          ((time() - cd_deploy_timestamp_seconds{result="success"}) < 6 * 3600)
+        labels:
+          severity: warning
+          domain: cicd
+        annotations:
+          summary: "배포 소요시간 증가: {{ $labels.app }} ({{ $labels.env }}, {{ $value | humanizeDuration }})"
+          description: "{{ $labels.app }}/{{ $labels.env }} 의 최근 성공 배포가 600초를 초과했습니다."

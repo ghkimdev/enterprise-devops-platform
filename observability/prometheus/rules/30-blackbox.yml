@@ -1,0 +1,57 @@
+# 30-blackbox.yml
+# 엔드포인트 가용성 (domain=cicd, blackbox-exporter)
+#
+# instance 라벨 = 프로브 대상 URL (relabel: __param_target → instance).
+# 대상: jenkins/login, nexus/status, rundeck, svn  (job_name="blackbox")
+groups:
+  - name: cicd-endpoint
+    rules:
+      # 프로브 실패 = 외부에서 본 서비스 다운. 사용자가 가장 먼저 체감하는 알림.
+      - alert: EndpointDown
+        expr: probe_success == 0
+        for: 3m
+        labels:
+          severity: critical
+          domain: cicd
+        annotations:
+          summary: "엔드포인트 다운: {{ $labels.instance }}"
+          description: "{{ $labels.instance }} 에 대한 HTTP 프로브가 3분 이상 실패하고 있습니다."
+
+      - alert: EndpointSlow
+        expr: probe_duration_seconds > 5
+        for: 10m
+        labels:
+          severity: warning
+          domain: cicd
+        annotations:
+          summary: "엔드포인트 응답 지연: {{ $labels.instance }} ({{ printf \"%.1f\" $value }}s)"
+          description: "{{ $labels.instance }} 의 프로브 총 소요시간이 10분 이상 5초를 초과합니다."
+
+      # ── SSL 인증서 만료 ───────────────────────────────────────────────
+      # 현재 휴면: prometheus.yml 의 blackbox 타깃이 전부 http:// 라 probe_ssl_* 메트릭이 없음.
+      # 활성화: ① blackbox.yml 에 https 모듈 추가, ② prometheus 에 https:// 타깃 추가.
+      #   예) blackbox.yml:
+      #         https_2xx:
+      #           prober: http
+      #           http:
+      #             fail_if_not_ssl: true
+      #       prometheus.yml blackbox 타깃에 https://grafana.example.com 등 추가 (module: [https_2xx])
+      - alert: SslCertExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) < 21 * 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+          domain: cicd
+        annotations:
+          summary: "TLS 인증서 21일 내 만료: {{ $labels.instance }}"
+          description: "{{ $labels.instance }} 의 인증서가 21일 내 만료됩니다. (남은 시간 약 {{ $value | humanizeDuration }})"
+
+      - alert: SslCertExpiringCritical
+        expr: (probe_ssl_earliest_cert_expiry - time()) < 7 * 24 * 3600
+        for: 1h
+        labels:
+          severity: critical
+          domain: cicd
+        annotations:
+          summary: "TLS 인증서 7일 내 만료: {{ $labels.instance }}"
+          description: "{{ $labels.instance }} 의 인증서가 7일 내 만료됩니다. 즉시 갱신이 필요합니다."

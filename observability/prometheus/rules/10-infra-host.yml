@@ -1,0 +1,103 @@
+# 10-infra-host.yml
+# 호스트 인프라 (domain=infra, node-exporter)
+#
+# 임계값 정책(보수적): 디스크 여유 <20% warning / <10% critical.
+# fstype 필터: 가상/임시 파일시스템 제외(tmpfs/overlay/squashfs/lxcfs/nsfs/ramfs).
+# app 라벨이 없으므로 critical 은 severity 라우트로 devops-team(페이징)으로 감.
+groups:
+  - name: infra-host
+    rules:
+      # ── 디스크 여유 공간 ──────────────────────────────────────────────
+      - alert: HostDiskSpaceLow
+        expr: |
+          100 * node_filesystem_avail_bytes{fstype="ext4", mountpoint="/var/lib/docker"}
+            / node_filesystem_size_bytes{fstype="ext4", mountpoint="/var/lib/docker"} < 20
+        for: 10m
+        labels:
+          severity: warning
+          domain: infra
+        annotations:
+          summary: "디스크 여유 부족: {{ $labels.instance }} {{ $labels.mountpoint }} ({{ printf \"%.0f\" $value }}%)"
+          description: "{{ $labels.mountpoint }} 의 여유 공간이 20% 미만입니다. (현재 {{ printf \"%.0f\" $value }}%)"
+
+      - alert: HostDiskSpaceCritical
+        expr: |
+          100 * node_filesystem_avail_bytes{fstype="ext4", mountpoint="/var/lib/docker"}
+            / node_filesystem_size_bytes{fstype="ext4", mountpoint="/var/lib/docker"} < 10
+        for: 5m
+        labels:
+          severity: critical
+          domain: infra
+        annotations:
+          summary: "디스크 임계: {{ $labels.instance }} {{ $labels.mountpoint }} ({{ printf \"%.0f\" $value }}%)"
+          description: "{{ $labels.mountpoint }} 의 여유 공간이 10% 미만입니다. Nexus 블롭/Docker 이미지/Jenkins 워크스페이스 정리가 필요합니다."
+
+      # 선행 경보: 현재 추세로 24시간 내 가득 참 (단, 여유 30% 미만일 때만 — 큰 디스크 노이즈 방지)
+      - alert: HostDiskWillFillIn24h
+        expr: |
+          (predict_linear(node_filesystem_avail_bytes{fstype="ext4", mountpoint="/var/lib/docker"}[6h], 24 * 3600) < 0)
+          and
+          (100 * node_filesystem_avail_bytes{fstype="ext4", mountpoint="/var/lib/docker"}
+             / node_filesystem_size_bytes{fstype="ext4", mountpoint="/var/lib/docker"} < 30)
+        for: 1h
+        labels:
+          severity: warning
+          domain: infra
+        annotations:
+          summary: "디스크 24h 내 가득 참 예상: {{ $labels.instance }} {{ $labels.mountpoint }}"
+          description: "최근 6시간 추세 기준 {{ $labels.mountpoint }} 가 24시간 내 가득 찰 것으로 예측됩니다."
+
+      - alert: HostInodesLow
+        expr: |
+          100 * node_filesystem_files_free{fstype="ext4", mountpoint="/var/lib/docker"}
+            / node_filesystem_files{fstype="ext4", mountpoint="/var/lib/docker"} < 15
+        for: 15m
+        labels:
+          severity: warning
+          domain: infra
+        annotations:
+          summary: "inode 부족: {{ $labels.instance }} {{ $labels.mountpoint }} ({{ printf \"%.0f\" $value }}%)"
+          description: "여유 inode 가 15% 미만입니다. 작은 파일이 많은 SVN/Nexus 경로에서 디스크 용량과 무관하게 쓰기 실패가 날 수 있습니다."
+
+      - alert: HostFilesystemReadOnly
+        expr: node_filesystem_readonly{fstype="ext4", mountpoint="/var/lib/docker"} == 1
+        for: 2m
+        labels:
+          severity: critical
+          domain: infra
+        annotations:
+          summary: "파일시스템 읽기전용 전환: {{ $labels.instance }} {{ $labels.mountpoint }}"
+          description: "{{ $labels.mountpoint }} 가 읽기전용으로 마운트되었습니다. 디스크 오류 가능성이 높습니다."
+
+      # ── 메모리 ────────────────────────────────────────────────────────
+      - alert: HostMemoryLow
+        expr: 100 * (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 15
+        for: 10m
+        labels:
+          severity: warning
+          domain: infra
+        annotations:
+          summary: "메모리 여유 부족: {{ $labels.instance }} ({{ printf \"%.0f\" $value }}%)"
+          description: "가용 메모리가 15% 미만입니다."
+
+      - alert: HostMemoryCritical
+        expr: 100 * (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 8
+        for: 5m
+        labels:
+          severity: critical
+          domain: infra
+        annotations:
+          summary: "메모리 임계: {{ $labels.instance }} ({{ printf \"%.0f\" $value }}%)"
+          description: "가용 메모리가 8% 미만입니다. OOM 위험이 큽니다."
+
+      # ── CPU ───────────────────────────────────────────────────────────
+      - alert: HostHighCpuLoad
+        expr: |
+          100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 85
+        for: 15m
+        labels:
+          severity: warning
+          domain: infra
+        annotations:
+          summary: "CPU 사용률 높음: {{ $labels.instance }} ({{ printf \"%.0f\" $value }}%)"
+          description: "15분 이상 CPU 사용률이 85%를 초과하고 있습니다."
