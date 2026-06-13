@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 echo "[entrypoint] generating apache config..."
 envsubst < /etc/apache2/conf-enabled/svn.conf.template \
