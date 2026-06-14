@@ -52,7 +52,7 @@
   "timezone": "",
   "title": "CI/CD Service Health (Jenkins/Nexus)",
   "uid": "cicd-service-health",
-  "version": 1,
+  "version": 2,
   "weekStart": "",
   "panels": [
     {
@@ -135,7 +135,7 @@
       "id": 2,
       "type": "stat",
       "title": "Executors In Use",
-      "description": "사용 중 익스큐터 (free=jenkins_executor_free_value).",
+      "description": "사용 중 익스큐터 (free/total 은 아래 그래프).",
       "gridPos": {
         "h": 4,
         "w": 4,
@@ -194,7 +194,7 @@
       "id": 3,
       "type": "stat",
       "title": "Queue Size",
-      "description": "대기 큐 길이. stuck 은 별도(아래 그래프).",
+      "description": "대기 큐 길이.",
       "gridPos": {
         "h": 4,
         "w": 4,
@@ -261,7 +261,7 @@
       "id": 4,
       "type": "stat",
       "title": "Health Score",
-      "description": "Jenkins 자체 헬스체크 점수(1=정상).",
+      "description": "Jenkins 헬스체크 점수(1=정상).",
       "gridPos": {
         "h": 4,
         "w": 4,
@@ -330,7 +330,7 @@
       "id": 5,
       "type": "stat",
       "title": "Stuck in Queue",
-      "description": "스케줄 불가(stuck) 작업 수. 0이어야 정상.",
+      "description": "스케줄 불가(stuck) 작업 수.",
       "gridPos": {
         "h": 4,
         "w": 4,
@@ -392,8 +392,8 @@
     {
       "id": 6,
       "type": "stat",
-      "title": "Total Executors",
-      "description": "전체 익스큐터 용량.",
+      "title": "JVM Heap Usage",
+      "description": "Jenkins JVM 힙 사용률(used/max). ※ 비면 vm_memory_heap_usage 노출 여부 확인.",
       "gridPos": {
         "h": 4,
         "w": 4,
@@ -411,13 +411,13 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "jenkins_executor_count_value",
+          "expr": "vm_memory_heap_usage",
           "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "percentunit",
           "color": {
             "mode": "thresholds"
           },
@@ -425,11 +425,21 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "blue",
+                "color": "green",
                 "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.9
               }
             ]
-          }
+          },
+          "max": 1,
+          "min": 0
         },
         "overrides": []
       },
@@ -452,7 +462,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "Queue Breakdown",
-      "description": "큐 상태 분해. blocked/stuck 이 지속되면 에이전트/라벨 문제.",
+      "description": "큐 상태 분해. blocked/stuck 지속 시 에이전트/라벨 문제.",
       "gridPos": {
         "h": 7,
         "w": 12,
@@ -474,7 +484,7 @@
           "legendFormat": "size"
         },
         {
-          "refId": "A",
+          "refId": "B",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -483,7 +493,7 @@
           "legendFormat": "blocked"
         },
         {
-          "refId": "A",
+          "refId": "C",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -492,7 +502,7 @@
           "legendFormat": "buildable"
         },
         {
-          "refId": "A",
+          "refId": "D",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -501,7 +511,7 @@
           "legendFormat": "stuck"
         },
         {
-          "refId": "A",
+          "refId": "E",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -564,7 +574,7 @@
           "legendFormat": "total"
         },
         {
-          "refId": "A",
+          "refId": "B",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -573,7 +583,7 @@
           "legendFormat": "in use"
         },
         {
-          "refId": "A",
+          "refId": "C",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -611,13 +621,13 @@
       }
     },
     {
-      "id": 9,
-      "type": "table",
-      "title": "Jobs — Last Build Result (비정상만)",
-      "description": "ordinal: 0 SUCCESS / 1 UNSTABLE / 2 FAILURE / 3 NOT_BUILT / 4 ABORTED. >=1 만 표시.",
+      "id": 16,
+      "type": "timeseries",
+      "title": "JVM Heap (used / committed / max)",
+      "description": "Jenkins 힙. used 가 max 에 붙고 GC 후에도 안 내려가면 증설 필요. (metrics 플러그인 vm_memory_heap_*)",
       "gridPos": {
         "h": 7,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 12
       },
@@ -632,9 +642,81 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
+          "expr": "vm_memory_heap_used",
+          "legendFormat": "used"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vm_memory_heap_committed",
+          "legendFormat": "committed"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vm_memory_heap_max",
+          "legendFormat": "max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Jobs — Last Build Result (비정상만)",
+      "description": "ordinal: 0 SUCCESS / 1 UNSTABLE / 2 FAILURE / 3 NOT_BUILT / 4 ABORTED. >=1 만 표시.",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "default_jenkins_builds_last_build_result_ordinal >= 1",
-          "instant": true,
-          "format": "table"
+          "format": "table",
+          "instant": true
         }
       ],
       "transformations": [
@@ -879,7 +961,7 @@
       "id": 12,
       "type": "stat",
       "title": "Heap Used",
-      "description": "현재 힙 사용량(bytes).",
+      "description": "현재 힙 사용량.",
       "gridPos": {
         "h": 4,
         "w": 6,
@@ -1019,7 +1101,7 @@
           "legendFormat": "used"
         },
         {
-          "refId": "A",
+          "refId": "B",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -1028,7 +1110,7 @@
           "legendFormat": "committed"
         },
         {
-          "refId": "A",
+          "refId": "C",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -1069,7 +1151,7 @@
       "id": 15,
       "type": "timeseries",
       "title": "GC Pools Usage (ratio)",
-      "description": "Eden 톱니파형=정상 GC. Old Gen 우상향 지속=문제.",
+      "description": "Eden 톱니=정상 GC. Old Gen 우상향 지속=문제.",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -1091,7 +1173,7 @@
           "legendFormat": "Eden"
         },
         {
-          "refId": "A",
+          "refId": "B",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -1100,7 +1182,7 @@
           "legendFormat": "Old Gen"
         },
         {
-          "refId": "A",
+          "refId": "C",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
@@ -1109,7 +1191,7 @@
           "legendFormat": "Survivor"
         },
         {
-          "refId": "A",
+          "refId": "D",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
