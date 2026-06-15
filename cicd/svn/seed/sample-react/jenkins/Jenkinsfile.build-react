@@ -14,8 +14,8 @@ buildPipeline([
     rawRepo        : 'react-releases',
     npmRegistry    : 'http://nexus:8081/repository/npm-group/',
 
-    dockerRegistry : 'nexus.example.com:5000',
-    dockerImage    : 'nexus.example.com:5000/sample-react',
+    dockerRegistry : 'nexus.ghlab.dev:5000',
+    dockerImage    : 'nexus.ghlab.dev:5000/sample-react',
 
     checkitemJob   : 'web/01.sample-react-checkitem',
     devDeployJob   : 'web/03.sample-react-deploy',

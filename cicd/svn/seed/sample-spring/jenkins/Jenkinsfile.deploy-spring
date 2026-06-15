@@ -9,7 +9,7 @@ deployPipeline([
     nexusBase         : 'http://nexus:8081',
     nexusCreds        : 'nexus-creds',
     mavenReleasesRepo : 'maven-releases',
-    mavenGroupId      : 'com.example',
+    mavenGroupId      : 'dev.ghlab',
     mavenArtifactId   : 'sample-spring',
 
     rundeckInstance   : 'default',

@@ -1,16 +1,12 @@
 FROM debian:bookworm-20260505-slim
 
-COPY certs/ca.crt /usr/local/share/ca-certificates/self-ca.crt
-
 RUN apt-get update && apt-get install -y \
     curl \
     gettext-base \
     apache2 \
     subversion \
     libapache2-mod-svn \
-    ldap-utils \
-    ca-certificates \
-    && update-ca-certificates
+    ldap-utils 
 
 RUN a2enmod dav dav_svn ldap authnz_ldap
 

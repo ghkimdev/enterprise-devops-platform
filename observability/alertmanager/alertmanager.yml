@@ -1,6 +1,6 @@
 global:
   smtp_smarthost: 'mailhog:1025'
-  smtp_from: 'alertmanager@example.com'
+  smtp_from: 'alertmanager@ghlab.dev'
   smtp_require_tls: false
 
 route:
@@ -47,23 +47,23 @@ inhibit_rules:
 receivers:
   - name: 'devops-team'
     email_configs:
-      - to: 'devops-team@example.com'
+      - to: 'devops-team@ghlab.dev'
 
   - name: 'payment-team'
     email_configs:
-      - to: 'payment-team@example.com'
+      - to: 'payment-team@ghlab.dev'
 
   - name: 'web-team'
     email_configs:
-      - to: 'web-team@example.com'
+      - to: 'web-team@ghlab.dev'
 
   - name: 'ml-team'
     email_configs:
-      - to: 'ml-team@example.com'
+      - to: 'ml-team@ghlab.dev'
 
   # Watchdog 수신자 — 외부 dead man's switch(healthchecks.io 등)의 ping URL.
   # 이 알림이 끊기면 외부 모니터가 관측 스택 장애로 판단한다.
   - name: 'watchdog'
     webhook_configs:
-      - url: 'https://hc-ping.example.com/REPLACE_WITH_DEADMANSSWITCH_UUID'
+      - url: 'https://hc-ping.ghlab.dev/REPLACE_WITH_DEADMANSSWITCH_UUID'
         send_resolved: false

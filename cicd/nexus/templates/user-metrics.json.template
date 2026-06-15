@@ -2,7 +2,7 @@
   "userId": "metrics",
   "firstName": "Metrics",
   "lastName": "Scraper",
-  "emailAddress": "metrics@example.com",
+  "emailAddress": "metrics@ghlab.dev",
   "password": "${NEXUS_METRICS_PASSWORD}",
   "status": "active",
   "roles": [

@@ -12,11 +12,11 @@ buildPipeline([
     nexusBase         : 'http://nexus:8081',
     nexusCreds        : 'nexus-creds',
     mavenReleasesRepo : 'maven-releases',
-    mavenGroupId      : 'com.example',
+    mavenGroupId      : 'dev.ghlab',
     mavenArtifactId   : 'sample-spring',
 
-    dockerRegistry    : 'nexus.example.com:5000',
-    dockerImage       : 'nexus.example.com:5000/sample-spring',
+    dockerRegistry    : 'nexus.ghlab.dev:5000',
+    dockerImage       : 'nexus.ghlab.dev:5000/sample-spring',
 
     checkitemJob      : 'payment/01.sample-spring-checkitem',
     devDeployJob      : 'payment/03.sample-spring-deploy',

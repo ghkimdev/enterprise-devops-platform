@@ -7,7 +7,7 @@ ENV APP_VERSION=${APP_VERSION}
 ENV PYTHONUNBUFFERED=1
 
 # Nexus pypi proxy 사용 예시 (Jenkins 에서 --index-url 로 주입 가능)
-# ARG PIP_INDEX_URL=http://nexus.example.com/repository/pypi-proxy/simple/
+# ARG PIP_INDEX_URL=http://nexus.ghlab.dev/repository/pypi-proxy/simple/
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

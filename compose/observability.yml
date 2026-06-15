@@ -131,7 +131,6 @@ services:
       - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - ../observability/grafana/provisioning/ldap.toml:/etc/grafana/ldap.toml:ro
-      - ../certs/ca/ca.crt:/etc/grafana/ldap/ca.crt:ro
       - grafana_data:/var/lib/grafana
     depends_on: 
       prometheus:

@@ -10,7 +10,7 @@ services:
       - "5001:5001"
     volumes:
       - ../ingress/nginx/conf.d:/etc/nginx/conf.d
-      - ../certs:/etc/nginx/certs
+      - ../ingress/nginx/certs:/etc/nginx/certs
     networks:
       - cicd-net
     healthcheck:
@@ -24,7 +24,7 @@ services:
     build:
       context: ../cicd/jenkins
       dockerfile: docker/Dockerfile
-    hostname: jenkins.example.com
+    hostname: jenkins.ghlab.dev
     container_name: jenkins
     restart: unless-stopped
     env_file:
@@ -45,10 +45,8 @@ services:
         condition: service_healthy
  
   nexus:
-    build:
-      context: ../cicd/nexus
-      dockerfile: docker/Dockerfile
-    hostname: nexus.example.com
+    image: sonatype/nexus3:3.92.0
+    hostname: nexus.ghlab.dev
     container_name: nexus
     restart: unless-stopped
     env_file:
@@ -91,10 +89,8 @@ services:
       - nexus
 
   rundeck:
-    build:
-      context: ../cicd/rundeck
-      dockerfile: docker/Dockerfile
-    hostname: rundeck.example.com
+    image: rundeck/rundeck:5.20.0
+    hostname: rundeck.ghlab.dev
     container_name: rundeck
     restart: unless-stopped
     environment:
@@ -147,7 +143,7 @@ services:
     build: 
       context: ../cicd/svn
       dockerfile: docker/Dockerfile
-    hostname: svn.example.com
+    hostname: svn.ghlab.dev
     container_name: svn
     restart: unless-stopped
     env_file:
@@ -172,6 +168,7 @@ services:
   ldap:
     container_name: ldap
     image: osixia/openldap:1.5.0
+    hostname: ldap.ghlab.dev
     environment:
       LDAP_ORGANISATION: ${LDAP_ORGANISATION}
       LDAP_DOMAIN: ${LDAP_DOMAIN}
@@ -188,7 +185,9 @@ services:
       - ../identity/ldap/certs:/container/service/slapd/assets/certs
     command: --copy-service
     networks:
-      - cicd-net
+      cicd-net:
+        aliases:
+          - ldap.ghlab.dev
     healthcheck:
       test: ["CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -b '' -s base '(objectclass=*)' >/dev/null"]
       interval: 30s

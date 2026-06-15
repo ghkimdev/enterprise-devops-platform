@@ -15,8 +15,8 @@ buildPipeline([
     pipIndexUrl    : 'http://nexus:8081/repository/pypi-group/simple',
     pipTrustedHost : 'nexus',
 
-    dockerRegistry : 'nexus.example.com:5000',
-    dockerImage    : 'nexus.example.com:5000/sample-fastapi',
+    dockerRegistry : 'nexus.ghlab.dev:5000',
+    dockerImage    : 'nexus.ghlab.dev:5000/sample-fastapi',
 
     checkitemJob   : 'ml/01.sample-fastapi-checkitem',
     devDeployJob   : 'ml/03.sample-fastapi-deploy',

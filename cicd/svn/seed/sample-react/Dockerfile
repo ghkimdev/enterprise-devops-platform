@@ -6,7 +6,7 @@ ARG APP_VERSION=dev
 ENV VITE_APP_VERSION=${APP_VERSION}
 
 # Nexus npm proxy 사용 시 npm config로 registry 변경
-# RUN npm config set registry http://nexus.example.com/repository/npm-proxy/
+# RUN npm config set registry http://nexus.ghlab.dev/repository/npm-proxy/
 
 COPY package*.json ./
 RUN npm ci

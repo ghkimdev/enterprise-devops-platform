@@ -13,7 +13,7 @@
 #       stg-oncall  = carol, frank, irene
 #       prod-oncall = alice, david, grace, oscar
 #   - 메일링 리스트는 별도 LDAP entity로 만들지 않음. MailHog가 모든 메일을 receive하므로
-#     <user>@example.com, <team>@example.com, <env>-oncall@example.com 형식의 주소만
+#     <user>@ghlab.dev, <team>@ghlab.dev, <env>-oncall@ghlab.dev 형식의 주소만
 #     실제로 어딘가에 도달하기만 하면 된다 (테스트 목적).
 #     운영 환경에선 메일링 리스트를 별도 시스템(Google Groups 등)으로 관리.
 # =====================================================================
@@ -36,7 +36,7 @@ ou: users
 
 dn: cn=admin, ou=users,{{ LDAP_BASE_DN }}
 uid: admin
-mail: admin@example.com
+mail: admin@ghlab.dev
 userPassword: admin
 objectClass: person
 objectClass: top
@@ -60,7 +60,7 @@ cn: admin
 
 dn: cn=alice, ou=users,{{ LDAP_BASE_DN }}
 uid: alice
-mail: alice@example.com
+mail: alice@ghlab.dev
 userPassword: alice
 objectClass: person
 objectClass: top
@@ -71,7 +71,7 @@ givenName: Alice
 
 dn: cn=bob, ou=users,{{ LDAP_BASE_DN }}
 uid: bob
-mail: bob@example.com
+mail: bob@ghlab.dev
 userPassword: bob
 objectClass: person
 objectClass: top
@@ -82,7 +82,7 @@ givenName: Bob
 
 dn: cn=carol, ou=users,{{ LDAP_BASE_DN }}
 uid: carol
-mail: carol@example.com
+mail: carol@ghlab.dev
 userPassword: carol
 objectClass: person
 objectClass: top
@@ -97,7 +97,7 @@ givenName: Carol
 
 dn: cn=david, ou=users,{{ LDAP_BASE_DN }}
 uid: david
-mail: david@example.com
+mail: david@ghlab.dev
 userPassword: david
 objectClass: person
 objectClass: top
@@ -108,7 +108,7 @@ givenName: David
 
 dn: cn=eve, ou=users,{{ LDAP_BASE_DN }}
 uid: eve
-mail: eve@example.com
+mail: eve@ghlab.dev
 userPassword: eve
 objectClass: person
 objectClass: top
@@ -119,7 +119,7 @@ givenName: Eve
 
 dn: cn=frank, ou=users,{{ LDAP_BASE_DN }}
 uid: frank
-mail: frank@example.com
+mail: frank@ghlab.dev
 userPassword: frank
 objectClass: person
 objectClass: top
@@ -134,7 +134,7 @@ givenName: Frank
 
 dn: cn=grace, ou=users,{{ LDAP_BASE_DN }}
 uid: grace
-mail: grace@example.com
+mail: grace@ghlab.dev
 userPassword: grace
 objectClass: person
 objectClass: top
@@ -145,7 +145,7 @@ givenName: Grace
 
 dn: cn=henry, ou=users,{{ LDAP_BASE_DN }}
 uid: henry
-mail: henry@example.com
+mail: henry@ghlab.dev
 userPassword: henry
 objectClass: person
 objectClass: top
@@ -156,7 +156,7 @@ givenName: Henry
 
 dn: cn=irene, ou=users,{{ LDAP_BASE_DN }}
 uid: irene
-mail: irene@example.com
+mail: irene@ghlab.dev
 userPassword: irene
 objectClass: person
 objectClass: top
@@ -171,7 +171,7 @@ givenName: Irene
 
 dn: cn=oscar, ou=users,{{ LDAP_BASE_DN }}
 uid: oscar
-mail: oscar@example.com
+mail: oscar@ghlab.dev
 userPassword: oscar
 objectClass: person
 objectClass: top
@@ -226,7 +226,7 @@ uniqueMember: cn=alice,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=bob,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=carol,ou=users,{{ LDAP_BASE_DN }}
 cn: payment-team
-description: Owns sample-spring. Mailing list payment-team@example.com.
+description: Owns sample-spring. Mailing list payment-team@ghlab.dev.
 
 dn: cn=web-team, ou=roles,{{ LDAP_BASE_DN }}
 objectClass: groupOfUniqueNames
@@ -234,7 +234,7 @@ uniqueMember: cn=david,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=eve,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=frank,ou=users,{{ LDAP_BASE_DN }}
 cn: web-team
-description: Owns sample-react. Mailing list web-team@example.com.
+description: Owns sample-react. Mailing list web-team@ghlab.dev.
 
 dn: cn=ml-team, ou=roles,{{ LDAP_BASE_DN }}
 objectClass: groupOfUniqueNames
@@ -242,7 +242,7 @@ uniqueMember: cn=grace,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=henry,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=irene,ou=users,{{ LDAP_BASE_DN }}
 cn: ml-team
-description: Owns sample-fastapi. Mailing list ml-team@example.com.
+description: Owns sample-fastapi. Mailing list ml-team@ghlab.dev.
 
 # ─────────────────────────────────────────────────────────────────────
 # 신규: 환경별 oncall (cross-team)
@@ -254,7 +254,7 @@ uniqueMember: cn=bob,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=eve,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=henry,ou=users,{{ LDAP_BASE_DN }}
 cn: dev-oncall
-description: dev environment on-call. Mailing list dev-oncall@example.com.
+description: dev environment on-call. Mailing list dev-oncall@ghlab.dev.
 
 dn: cn=stg-oncall, ou=roles,{{ LDAP_BASE_DN }}
 objectClass: groupOfUniqueNames
@@ -262,7 +262,7 @@ uniqueMember: cn=carol,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=frank,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=irene,ou=users,{{ LDAP_BASE_DN }}
 cn: stg-oncall
-description: stg environment on-call. Mailing list stg-oncall@example.com.
+description: stg environment on-call. Mailing list stg-oncall@ghlab.dev.
 
 dn: cn=prod-oncall, ou=roles,{{ LDAP_BASE_DN }}
 objectClass: groupOfUniqueNames
@@ -271,4 +271,4 @@ uniqueMember: cn=david,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=grace,ou=users,{{ LDAP_BASE_DN }}
 uniqueMember: cn=oscar,ou=users,{{ LDAP_BASE_DN }}
 cn: prod-oncall
-description: prod environment on-call. Mailing list prod-oncall@example.com.
+description: prod environment on-call. Mailing list prod-oncall@ghlab.dev.

@@ -1,4 +1,4 @@
 unclassified:
   location:
-    url: "https://jenkins.example.com"
-    adminAddress: "admin@example.com"
+    url: "https://jenkins.ghlab.dev"
+    adminAddress: "admin@ghlab.dev"
