@@ -12,7 +12,7 @@ buildPipeline([
     nexusBase         : 'http://nexus:8081',
     nexusCreds        : 'nexus-creds',
     mavenReleasesRepo : 'maven-releases',
-    mavenGroupId      : 'dev.ghlab',
+    mavenGroupId      : 'com.example',
     mavenArtifactId   : 'sample-spring',
 
     dockerRegistry    : 'nexus.ghlab.dev:5000',
