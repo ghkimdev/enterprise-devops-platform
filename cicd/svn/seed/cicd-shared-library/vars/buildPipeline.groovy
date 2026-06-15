@@ -160,6 +160,24 @@ SVN_REVISION    : ${env.SVN_REVISION}"""
                     }
                 }
             }
+/*
+ * 임시 비활성화
+ *
+ * Nexus Docker Registry 연동 문제로 인해 Docker Build & Push 단계 비활성화
+ *
+ * 현황
+ * - 사설 인증서 환경에서는 정상 동작 확인
+ * - 공인 인증서 적용 이후 Docker Login/Push 실패
+ *
+ * 에러
+ * Get "https://nexus.ghlab.dev:5000/v2/":
+ * Client.Timeout exceeded while awaiting headers
+ *
+ * 추후 확인사항
+ * - Nexus Docker Connector 설정
+ * - Nginx Reverse Proxy 설정
+ * - Cloudflare 포트 전달 여부
+ * - TLS 인증서 및 라우팅 설정
 
             stage('Docker Build & Push') {
                 steps {
@@ -178,7 +196,7 @@ SVN_REVISION    : ${env.SVN_REVISION}"""
                     }
                 }
             }
-
+*/
             stage('Archive Build Metadata') {
                 steps {
                     script {
