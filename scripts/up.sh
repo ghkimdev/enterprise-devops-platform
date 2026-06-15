@@ -1,14 +1,14 @@
 #!/bin/bash
 # up.sh — 올바른 순서로 스택 기동
 #
-# 핵심: core(docker-compose.yml)가 cicd-net을 "생성"하고,
-#       보조 레이어(observability/nodes/agents)는 external로 "참조"한다.
-#       그래서 반드시 core를 먼저 띄워 네트워크를 만든 뒤 레이어를 얹어야 한다.
-#       (모든 -f를 한 번에 주면 external 선언이 병합돼 네트워크 생성이 무력화됨)
+# 순서
+#  [0/3] build.yml    → node/java/python base image 생성
+#  [1/3] cicd.yml     → cicd-net 생성
+#  [2/3] observability/nodes/agents 기동
 #
 # 사용:
-#   ./up.sh          # core + 존재하는 모든 보조 레이어
-#   ./up.sh core     # core만 (메모리 절약)
+#   ./up.sh
+#   ./up.sh core
 
 set -euo pipefail
 
@@ -21,17 +21,57 @@ ENV_FILE="${PROJECT_ROOT}/.env"
 # core만 기동
 if [ "${1:-}" = "core" ]; then
     echo "core만 기동..."
+
     docker compose \
       --env-file "${ENV_FILE}" \
-      -f ${COMPOSE_DIR}/cicd.yml \
+      -f "${COMPOSE_DIR}/cicd.yml" \
       up -d
-    echo -e "\n완료. (cicd-net 생성)"
+
+    echo
+    echo "완료. (cicd-net 생성)"
+
     docker network ls | grep cicd-net && echo "cicd-net OK"
+
     exit 0
 fi
 
-# 존재하는 보조 레이어 자동 수집
+##################################################
+# [0/3] Node Base Image Build
+##################################################
+
+if [ -f "${COMPOSE_DIR}/build.yml" ]; then
+
+    echo "[0/3] node base image 확인..."
+
+    NEED_BUILD=false
+
+    docker image inspect cicd-node-react:1.0 >/dev/null 2>&1 || NEED_BUILD=true
+    docker image inspect cicd-node-java:1.0 >/dev/null 2>&1 || NEED_BUILD=true
+    docker image inspect cicd-node-python:1.0 >/dev/null 2>&1 || NEED_BUILD=true
+
+    if [ "${NEED_BUILD}" = true ]; then
+
+        echo "[0/3] node base image build..."
+
+        docker compose \
+          --env-file "${ENV_FILE}" \
+          -f "${COMPOSE_DIR}/build.yml" \
+          build
+
+    else
+
+        echo "[0/3] node base image already exists"
+
+    fi
+
+fi
+
+##################################################
+# 보조 레이어 자동 수집
+##################################################
+
 EXTRA=()
+
 for f in \
   "${COMPOSE_DIR}/observability.yml" \
   "${COMPOSE_DIR}/nodes.yml" \
@@ -40,29 +80,46 @@ do
     [ -f "$f" ] && EXTRA+=(-f "$f")
 done
 
-# 1) core 먼저 — cicd-net 생성
-echo "[1/2] core 기동 — cicd-net 생성..."
+##################################################
+# [1/3] core 기동
+##################################################
+
+echo "[1/3] core 기동 — cicd-net 생성..."
+
 docker compose \
   --env-file "${ENV_FILE}" \
-  -f ${COMPOSE_DIR}/cicd.yml \
+  -f "${COMPOSE_DIR}/cicd.yml" \
   up -d
 
-# 2) 보조 레이어 — 이제 cicd-net이 존재하므로 external 참조가 해석됨
+##################################################
+# [2/3] 보조 레이어 기동
+##################################################
+
 if [ ${#EXTRA[@]} -gt 0 ]; then
-    echo "[2/2] 보조 레이어 기동 (${EXTRA[*]})..."
+
+    echo "[2/3] 보조 레이어 기동 (${EXTRA[*]})..."
+
     docker compose \
       --env-file "${ENV_FILE}" \
       -f "${COMPOSE_DIR}/cicd.yml" \
       "${EXTRA[@]}" \
       up -d
+
 fi
 
-echo -e "\n=================================================="
-docker network ls | grep cicd-net && echo "cicd-net OK"
+##################################################
+# 상태 출력
+##################################################
+
+echo
 echo "=================================================="
+
+docker network ls | grep cicd-net && echo "cicd-net OK"
+
+echo "=================================================="
+
 docker compose \
   --env-file "${ENV_FILE}" \
   -f "${COMPOSE_DIR}/cicd.yml" \
   "${EXTRA[@]}" \
   ps
-

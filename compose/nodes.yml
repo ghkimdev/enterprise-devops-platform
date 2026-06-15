@@ -29,9 +29,6 @@
 
 # ─── YAML anchor로 공통 설정 모음 (각 노드 정의 반복 최소화) ───
 x-node-react: &node-react
-  build:
-    context: ../cicd/nodes/docker
-    dockerfile: Dockerfile.node
   image: cicd-node-react:1.0
   privileged: true
   volumes:
@@ -41,9 +38,6 @@ x-node-react: &node-react
   command: ["/init/init-react-node.sh"]
 
 x-node-spring: &node-spring
-  build:
-    context: ../cicd/nodes/docker
-    dockerfile: Dockerfile.java
   image: cicd-node-java:1.0
   volumes:
     - ../cicd/rundeck/projects/sample/scripts:/var/lib/rundeck/project-scripts/sample:ro
@@ -52,9 +46,6 @@ x-node-spring: &node-spring
   command: ["/init/init-spring-node.sh"]
 
 x-node-fastapi: &node-fastapi
-  build:
-    context: ../cicd/nodes/docker
-    dockerfile: Dockerfile.python
   image: cicd-node-python:1.0
   volumes:
     - ../cicd/rundeck/projects/sample/scripts:/var/lib/rundeck/project-scripts/sample:ro

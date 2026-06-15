@@ -1,0 +1,19 @@
+services:
+
+  node-react:
+    build:
+      context: ../cicd/nodes/docker
+      dockerfile: Dockerfile.node
+    image: cicd-node-react:1.0
+
+  node-spring:
+    build:
+      context: ../cicd/nodes/docker
+      dockerfile: Dockerfile.java
+    image: cicd-node-java:1.0
+
+  node-fastapi:
+    build:
+      context: ../cicd/nodes/docker
+      dockerfile: Dockerfile.python
+    image: cicd-node-python:1.0

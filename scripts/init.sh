@@ -7,9 +7,9 @@
 #   → 내부 사설 CA 불필요. 공개 CA(ISRG/LE)는 모든 베이스 이미지가 이미 신뢰.
 #
 # 전제: 먼저 Let's Encrypt 와일드카드 + 레지스트리 호스트를 발급해 둘 것
-#   (docker.nexus.ghlab.dev 는 2단계라 *.ghlab.dev 로 안 덮이므로 명시 필요)
+#   (*.ghlab.dev 와일드카드가 웹 5종 + ldap.ghlab.dev 까지 모두 커버)
 #   sudo certbot certonly --dns-cloudflare --dns-cloudflare-credentials /root/cf.ini \
-#     -d ghlab.dev -d '*.ghlab.dev' -d docker.nexus.ghlab.dev
+#     -d ghlab.dev -d '*.ghlab.dev'
 #
 # 실행: ./init.sh   (sudo 없이 — 권한 필요한 단계만 내부에서 sudo)
 # 이후: ./up.sh
@@ -61,12 +61,15 @@ fi
 
 # ── 3) Let's Encrypt 인증서 배치 (웹 + LDAP + CA) ───────────────────
 step 3 "Let's Encrypt 인증서 배치"
-if [ ! -f "${LE_LIVE}/fullchain.pem" ]; then
+# /etc/letsencrypt/archive 는 700(root 전용)이라, live/ 의 심볼릭 링크 대상을
+# 일반 사용자로는 stat 할 수 없다. 존재 확인은 sudo 로 수행한다(복사도 sudo install).
+if ! sudo test -f "${LE_LIVE}/fullchain.pem"; then
     echo -e "  ${RED}Let's Encrypt 인증서를 찾을 수 없습니다: ${LE_LIVE}/fullchain.pem${NC}"
-    echo -e "  ${YELLOW}먼저 발급하세요 (docker.nexus 는 2단계라 와일드카드로 안 덮이므로 명시):${NC}"
+    echo -e "  ${YELLOW}먼저 발급하세요 (*.ghlab.dev 가 웹+LDAP 모두 커버):${NC}"
     echo -e "    sudo certbot certonly --dns-cloudflare \\"
     echo -e "      --dns-cloudflare-credentials /root/cf.ini \\"
-    echo -e "      -d ghlab.dev -d '*.ghlab.dev' -d docker.nexus.ghlab.dev"
+    echo -e "      --dns-cloudflare-propagation-seconds 30 \\"
+    echo -e "      -d ghlab.dev -d '*.ghlab.dev'"
     echo -e "  ${YELLOW}발급 후 ./init.sh 를 다시 실행하세요.${NC}"
     exit 1
 fi
@@ -78,12 +81,16 @@ for s in "${WEB_SERVICES[@]}"; do
 done
 ok "웹 ${#WEB_SERVICES[@]}종(${WEB_SERVICES[*]}) → Let's Encrypt"
 
-# (3-2) LDAP: osixia 파일명(fullchain.pem/privkey.pem/chain.pem)으로 배치
+# (3-2) LDAP: osixia 파일명(fullchain.pem/privkey.pem/privkey.pem)으로 배치
 #       ldap.ghlab.dev 는 *.ghlab.dev SAN 에 매칭되어 검증 통과
 sudo install -D -m644 "${LE_LIVE}/fullchain.pem" "${IDENTITY_DIR}/ldap/certs/fullchain.pem"
 sudo install -D -m600 "${LE_LIVE}/privkey.pem"   "${IDENTITY_DIR}/ldap/certs/privkey.pem"
 sudo install -D -m644 "${LE_LIVE}/chain.pem"     "${IDENTITY_DIR}/ldap/certs/chain.pem"
 ok "LDAP → Let's Encrypt (ldaps://ldap.ghlab.dev:636)"
+
+# (3-3) CA 파일: Grafana root_ca_cert 등이 참조하는 certs/ca/ca.crt = LE 체인
+sudo install -D -m644 "${LE_LIVE}/chain.pem" "${CERT_ROOT}/ca/ca.crt"
+ok "CA 파일(certs/ca/ca.crt) = LE 체인 (Grafana LDAP 검증용)"
 
 # ── 4) Rundeck 배포 SSH 키 ──────────────────────────────────────────
 step 4 "Rundeck 배포 SSH 키"
