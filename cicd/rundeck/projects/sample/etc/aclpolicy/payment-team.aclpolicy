@@ -1,0 +1,14 @@
+description: "payment-team → spring 잡 read/run (project 컨텍스트)"
+for:
+  job:
+    - match:
+        group: 'web-team(/.*)?'
+      allow: [read, run, kill]
+  node:
+    - contains:
+        tags: 'sample-spring'
+      allow: [read, run]
+  event:
+    - allow: [read]
+by:
+  group: payment-team

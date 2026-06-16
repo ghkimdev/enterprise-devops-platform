@@ -1,0 +1,17 @@
+description: "ml-team → fastapi 잡 read/run (project 컨텍스트)"
+for:
+  # fastapi 그룹 및 그 하위 그룹의 잡만 조회/실행/중단 가능
+  job:
+    - match:
+        group: 'ml-team(/.*)?'
+      allow: [read, run, kill]
+  # sample-fastapi 태그가 붙은 노드(dev/stg/prod-fastapi-*)에만 배포 실행 허용
+  node:
+    - contains:
+        tags: 'sample-fastapi'
+      allow: [read, run]
+  # 실행 이력/로그 조회
+  event:
+    - allow: [read]
+by:
+  group: ml-team

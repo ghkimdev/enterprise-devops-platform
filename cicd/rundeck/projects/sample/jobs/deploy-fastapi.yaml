@@ -24,7 +24,7 @@
   loglevel: INFO
   executionEnabled: true
   scheduleEnabled: false
-  group: applications
+  group: ml-team
 
   options:
     - name: app

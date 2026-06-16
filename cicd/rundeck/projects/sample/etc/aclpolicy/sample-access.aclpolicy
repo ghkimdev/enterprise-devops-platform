@@ -1,0 +1,14 @@
+description: "sample 프로젝트 접근 권한 (세 팀 공통, application 컨텍스트)"
+context:
+  application: 'rundeck'
+for:
+  # 세 팀 모두 sample 프로젝트를 보고 들어갈 수 있어야 함 (다른 프로젝트는 불가)
+  project:
+    - match:
+        name: 'sample'
+      allow: [read]
+by:
+  group:
+    - ml-team
+    - web-team
+    - payment-team

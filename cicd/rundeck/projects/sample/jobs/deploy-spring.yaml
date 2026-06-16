@@ -18,7 +18,7 @@
   loglevel: INFO
   executionEnabled: true
   scheduleEnabled: false
-  group: applications
+  group: payment-team
 
   options:
     - name: app
