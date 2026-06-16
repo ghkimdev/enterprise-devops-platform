@@ -292,7 +292,6 @@ Pushgateway로 전송하고 Prometheus가 수집하도록 구성했습니다.
 
 ![DORA 대시보드](docs/images/13-dora-dashboard.png)
 
-> *주: 위 화면의 수치는 동작 검증용 테스트 데이터입니다. 핵심은 값 자체가 아니라 **운영 중 부재하던 배포 가시성 체계를 구축**했다는 점입니다.*
 
 **Platform Overview** — 스크레이프 타깃 상태, 호스트 CPU/메모리/디스크, 발생 중 알림을 한눈에 확인합니다.
 
